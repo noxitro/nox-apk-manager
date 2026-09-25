@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 提供元不明アプリのインストール許可。初回に OS の設定画面へ飛ばして許可を取る。 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 自作アプリのインストール状態を見るため。API 30 以降は宣言しないと他アプリが見えない。 -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!--
+      更新を OS の確認ダイアログ無しで通すため(API 31 以降)。
+      これが無いと setRequireUserAction(USER_ACTION_NOT_REQUIRED) は黙って無視され、
+      自分が入れたアプリの 2 回目以降も毎回ダイアログが出る。2026-09-06 に Quest 3 で発覚。
+      通常権限なので実行時の許可要求は要らない。
+    -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+
+    <application
+        android:name=".ApkManagerApplication"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.NoxApkManager">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.NoxApkManager">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- PackageInstaller からの結果(ユーザー確認待ち / 成功 / 失敗)を受ける。 -->
+        <receiver
+            android:name=".install.InstallResultReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

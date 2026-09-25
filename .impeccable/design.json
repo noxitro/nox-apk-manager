@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-06T00:00:00+09:00",
+  "title": "Design System: Nox APK Manager",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Sky Primary", "canonical": "#A8C7FA", "tonalRamp": ["#0842A0", "#0B57D0", "#3B7BE0", "#6A9EEE", "#A8C7FA", "#C7DBFC", "#D3E3FD", "#EAF1FE"] },
+      "secondary-container": { "role": "secondary", "displayName": "Slate Container", "canonical": "#42474E", "tonalRamp": ["#1D2024", "#2C3137", "#42474E", "#5A5F66", "#74777F", "#8E9099", "#C4C6D0", "#DEE3EB"] },
+      "tertiary": { "role": "tertiary", "displayName": "Mint Done", "canonical": "#7FE0C0", "tonalRamp": ["#003828", "#00513B", "#006C4C", "#2E8F6C", "#5CB894", "#7FE0C0", "#A6F0D8", "#D6FBEE"] },
+      "surface": { "role": "neutral", "displayName": "Night Surface", "canonical": "#111318", "tonalRamp": ["#0C0E13", "#111318", "#191C20", "#1D2024", "#282A2F", "#33353A", "#44474E", "#E2E2E9"] }
+    },
+    "typographyMeta": {
+      "numeric": { "displayName": "Numeric", "purpose": "版番号・サイズ・件数。tnum で桁を揃える。" }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "job-line-reveal", "value": "expandVertically + fadeIn / shrinkVertically + fadeOut (Compose 既定 easing)", "purpose": "行の直下に進捗と実況が伸び縮みする唯一のモーション。" }
+    ],
+    "breakpoints": [
+      { "name": "compact", "value": "< 600dp (phone; NavigationBar)" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Update Button",
+      "kind": "button",
+      "refersTo": "button-update",
+      "description": "更新のある行の主操作。filled(primary)。",
+      "html": "<button class=\"ds-btn-update\">更新</button>",
+      "css": ".ds-btn-update { background: #A8C7FA; color: #062E6F; border: none; border-radius: 20px; padding: 10px 24px; font: 600 14px/20px Roboto, sans-serif; } .ds-btn-update:hover { filter: brightness(1.06); } .ds-btn-update:focus-visible { outline: 2px solid #E2E2E9; outline-offset: 2px; }"
+    },
+    {
+      "name": "Install Button",
+      "kind": "button",
+      "refersTo": "button-install",
+      "description": "未導入の行の主操作。tonal。",
+      "html": "<button class=\"ds-btn-install\">導入</button>",
+      "css": ".ds-btn-install { background: #42474E; color: #DEE3EB; border: none; border-radius: 20px; padding: 10px 24px; font: 600 14px/20px Roboto, sans-serif; } .ds-btn-install:hover { filter: brightness(1.1); } .ds-btn-install:focus-visible { outline: 2px solid #E2E2E9; outline-offset: 2px; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "すべて / 更新あり / 未導入 / 導入済み。件数付き。",
+      "html": "<span class=\"ds-chip\">更新あり 3</span>",
+      "css": ".ds-chip { display: inline-block; background: #42474E; color: #DEE3EB; border-radius: 8px; padding: 6px 12px; font: 500 14px/20px Roboto, sans-serif; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Update Board",
+      "kind": "card",
+      "refersTo": "board",
+      "description": "更新のある行を束ねる板。見出し + hairline + 行。",
+      "html": "<div class=\"ds-board\"><div class=\"ds-board-head\"><div><div class=\"ds-board-title\">更新あり</div><div class=\"ds-board-sub\">3 件 · 合計 42.1 MB</div></div><button class=\"ds-btn-update\">全て更新</button></div></div>",
+      "css": ".ds-board { background: #1D2024; border-radius: 20px; color: #E2E2E9; font-family: Roboto, sans-serif; } .ds-board-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 10px 20px; border-bottom: 1px solid #44474E; } .ds-board-title { font: 600 17px/24px Roboto, sans-serif; } .ds-board-sub { color: #C4C6D0; font: 400 14px/20px Roboto, sans-serif; font-variant-numeric: tabular-nums; } .ds-btn-update { background: #A8C7FA; color: #062E6F; border: none; border-radius: 20px; padding: 10px 24px; font: 600 14px/20px Roboto, sans-serif; }"
+    },
+    {
+      "name": "App Row",
+      "kind": "custom",
+      "refersTo": "app-row",
+      "description": "アイコン | 名前・説明・版行 | 主ボタン。",
+      "html": "<div class=\"ds-row\"><div class=\"ds-icon\">P</div><div class=\"ds-row-body\"><div class=\"ds-row-title\">Photo Viewer</div><div class=\"ds-row-desc\">端末とクラウドの写真をまとめて見る写真ビューア</div><div class=\"ds-row-ver\"><span class=\"muted\">0.5.0</span> <span class=\"muted\">→</span> <b>0.6.0</b> <span class=\"muted\">· 15.8 MB · release</span></div></div><button class=\"ds-btn-update\">更新</button></div>",
+      "css": ".ds-row { display: flex; align-items: center; gap: 16px; padding: 12px 16px; color: #E2E2E9; font-family: Roboto, sans-serif; } .ds-icon { width: 48px; height: 48px; border-radius: 12px; background: #42474E; color: #DEE3EB; display: grid; place-items: center; font: 500 22px Roboto, sans-serif; } .ds-row-body { flex: 1; min-width: 0; } .ds-row-title { font: 600 17px/24px Roboto, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-row-desc { color: #C4C6D0; font: 400 14px/20px Roboto, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-row-ver { font: 400 12px/16px Roboto, sans-serif; font-variant-numeric: tabular-nums; margin-top: 2px; } .ds-row-ver .muted { color: #C4C6D0; } .ds-btn-update { background: #A8C7FA; color: #062E6F; border: none; border-radius: 20px; padding: 10px 24px; font: 600 14px/20px Roboto, sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "更新タブだけのストア",
+    "overview": "Play ストアの「更新を保留中」タブを、Samsung Good Lock の縦構造(見出し帯 → 絞り込みチップ → 更新の板 → 行)に組んだもの。独自の世界観は持たず、Material 3 の標準部品と標準の色役割だけで組む。色は「更新」ボタン・件数・進捗・状態語にだけ使い、面はすべて無彩のトーナル階層で組む。",
+    "keyCharacteristics": [
+      "更新のある行を上段の板(surfaceContainer)に束ね、それ以外は素の面に並べる",
+      "版番号・サイズ・件数は等幅数字(tnum)。矢印 → で「入っている版 → 取れる版」",
+      "状態は色だけで語らない。必ず状態語を添える",
+      "進行中は行の直下に進捗バーと 1 行の実況が伸びる(モーダルにしない)"
+    ],
+    "rules": [
+      { "name": "The One Button Rule", "body": "filled(primary)のボタンは「更新」と「全て更新」だけ。導入は tonal、開くは outlined。", "section": "colors" },
+      { "name": "The Words-Too Rule", "body": "状態は必ず文字を伴う。色は補助。", "section": "colors" },
+      { "name": "The Tabular Rule", "body": "数字が縦に並ぶ場所は必ず tnum。", "section": "typography" },
+      { "name": "The Flat Board Rule", "body": "板は色面と角丸で「まとまり」を示す。影も枠線も持たない。", "section": "elevation" }
+    ],
+    "dos": [
+      "Do 更新のある行を板に束ね、板の見出しに件数と合計サイズを出す。",
+      "Do 版番号・サイズ・件数を tnum で組む。",
+      "Do 失敗を行の中で言葉で出し、次の一手を含める。",
+      "Do Material 3 の標準部品をそのまま使い、色は役割トークンから取る。"
+    ],
+    "donts": [
+      "Don't primary を装飾に使わない。",
+      "Don't 影・枠線・グラデーションで面を飾らない。",
+      "Don't 状態を色だけで示さない。",
+      "Don't 進行状況をモーダルやトーストにしない。"
+    ]
+  }
+}

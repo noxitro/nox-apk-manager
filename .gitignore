@@ -1,0 +1,20 @@
+*.iml
+.gradle/
+/local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild
+.cxx
+local.properties
+.kotlin/
+
+# エミュレータ検証で撮ったスクリーンショットの置き場
+/build/shots/
+
+# impeccable のセッション固有の作業ファイル(設計の成果物 design.json / surfaces は残す)
+/.impeccable/questions/
+/.impeccable/build/
+/.impeccable/review/
+/.impeccable/mocks/

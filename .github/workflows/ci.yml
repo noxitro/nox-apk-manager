@@ -1,0 +1,142 @@
+# nox-apk-manager の CI
+#
+# 目的: 機能追加のたびに、決めたテストが全部通ることと、起動時に落ちないことを確かめる。
+#
+# 構成
+#   unit         … JVM 単体テストとビルド。push のたびに走る。数分。
+#   instrumented … エミュレータ上の計装テストと起動スモーク。
+#                  無料枠を守るため手動実行 (workflow_dispatch) のときだけ走る。
+#
+# 「BUILD SUCCESSFUL」は証明にならない。テストが 0 件でも成功で返るので、
+# 結果 XML の tests= を数えて最低件数を下回ったら失敗にしている
+# (.github/scripts/check-test-results.py)。
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# 同じブランチで新しい push が来たら古い実行は捨てる。無駄な課金を避ける。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 単体テスト ────────────────────────────────────────────
+  unit:
+    name: 単体テストとビルド
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # テストの正本(docs/TESTING.md)がコードとずれていないか。
+      # 正本が黙って古くなると、文書を読んで判断する側が実態と違う結論を出す。
+      - name: TESTING.md とコードの突き合わせ
+        run: python3 .github/scripts/verify-testing-doc.py
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 単体テストと debug ビルド
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+
+      - name: 実行件数を確かめる
+        if: always()
+        run: |
+          python3 .github/scripts/check-test-results.py \
+            app/build/test-results/testDebugUnitTest \
+            --min 12 --label "単体テスト"
+
+      - name: APK とレポートを残す
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-reports
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+            app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ── 起動スモーク(エミュレータ)──────────────────────────────
+  # このリポジトリにはまだ計装テストが無いので、起動して落ちないことだけを見る。
+  # 計装テストを足したら、他のリポジトリと同じ connectedDebugAndroidTest に差し替える。
+  instrumented:
+    name: 起動スモーク (API ${{ matrix.api-level }})
+    # 手動実行のときだけ走らせる。エミュレータのジョブは 1 回約 13 分
+    # (大半はエミュレータの起動) で、無料枠 2,000 分はアカウント全体で
+    # 共有される。main への push と PR で回していたぶんがそのまま枠を
+    # 削っていたので、book-log と同じ方針に揃えた。
+    #
+    # テストは消していない。配布 (APK を渡す) のたびに手元で
+    #   ./gradlew connectedDebugAndroidTest
+    # を通してから渡すこと。手元の実機/エミュレータが使えないときは
+    # Actions の「Run workflow」からこのジョブを回す。
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [34]
+    steps:
+      - uses: actions/checkout@v4
+
+      # エミュレータの userdata パーティションに 7GB 要る。ランナーの既定の空きでは足りず
+      # 「Not enough space to create userdata partition」で落ちる(2026-09-06 に実測)。
+      # このビルドで使わない巨大なツールチェーンを先に消す。
+      - name: 空き容量を確保する
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost                       /usr/share/swift /usr/local/lib/android/sdk/ndk || true
+          df -h /
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: KVM を有効にする
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: APK を作る
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: 起動スモーク
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          # ローカル検証と同じ端末に揃える。画面が変わると Compose の UI テストが落ちる。
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: bash .github/scripts/launch-smoke.sh com.noxitro.apkmanager .MainActivity
+
+      - name: ログを残す
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-smoke-api${{ matrix.api-level }}
+          path: logcat-full.txt
+          retention-days: 14
+          if-no-files-found: ignore
