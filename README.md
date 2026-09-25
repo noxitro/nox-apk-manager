@@ -82,3 +82,7 @@ scripts/                    … publish-apk.ps1 / regen-meta.ps1 / apk-meta.ps1(
 ## 法的な位置づけ
 
 ローカル環境での個人利用のみ。ストアや公開リポジトリには出さない。
+
+## ライセンス
+
+[MIT License](LICENSE)
