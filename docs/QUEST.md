@@ -262,4 +262,4 @@ pwsh scripts/check-drive-service-account.ps1 -KeyFile ~/.secrets/nox-drive-sa.js
 ## 分かったことを書き戻す場所
 
 Horizon OS 側の挙動(◎ になった項目)は、この文書と
-`global-llm-wiki` の `nox-apk-manager構築記録` の両方に残す。書き戻しはユーザーの明示依頼があるときだけ。
+手元の wiki の構築記録の両方に残す。書き戻しはユーザーの明示依頼があるときだけ。

@@ -8,7 +8,7 @@
 
   .EXAMPLE
   .\regen-meta.ps1
-  .\regen-meta.ps1 -Descriptions @{ "photo-viewer" = "写真ビューア"; "book-log" = "読書記録" }
+  .\regen-meta.ps1 -Descriptions @{ "photo-viewer" = "写真ビューア" }
 #>
 param(
     [hashtable]$Descriptions = @{},
