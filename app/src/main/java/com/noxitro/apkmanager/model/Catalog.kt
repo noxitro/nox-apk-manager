@@ -14,7 +14,7 @@ enum class Variant(val fileSuffix: String) {
 }
 
 /**
- * Drive の builds/<project>/meta.json。PC 側の scripts/publish-apk.ps1 が書く。
+ * Drive の builds/<project>/meta.json。PC 側の scripts/publish-apk.ps1 か、CI の .github/actions/publish-apk が書く。
  * 無いフォルダもあり得る(古い配布)ので、無ければファイル名からの推定にフォールバックする。
  */
 @Serializable

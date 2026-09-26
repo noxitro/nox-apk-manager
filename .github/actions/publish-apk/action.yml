@@ -1,0 +1,81 @@
+# ビルド済みの APK を Google Drive の builds/<project>/ に置く(nox-apk-manager から入れられるようにする)。
+# 普段は .github/workflows/publish-apk.yml から使う。独自の手順でビルド・署名するリポジトリは、
+# ビルドのあとにこの Action を直接呼ぶ。使い方は docs/CD.md。
+name: Publish APK for nox-apk-manager
+description: ビルド済みの APK を Google Drive の builds/<project>/ に置き、meta.json を更新する
+
+inputs:
+  project:
+    description: builds/ 直下のフォルダ名。APK のファイル名にも使う
+    required: true
+  apk:
+    description: 置く APK のパス
+    required: true
+  variant:
+    description: release か debug
+    default: release
+  description-file:
+    description: 一覧に出す説明文のファイル(任意)
+    default: ""
+  icon:
+    description: 一覧に出すアイコンの PNG(任意)
+    default: ""
+  signing-cert-sha256:
+    description: APK の署名の SHA-256 がこれと違えば置かない(任意)
+    default: ""
+  drive-folder:
+    description: マイドライブから見た builds/ の場所
+    default: builds
+  drive-token:
+    description: rclone authorize "drive" で作ったトークン
+    required: true
+  force:
+    description: 同じ versionCode の版が Drive にあっても置き直す
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: rclone を入れる
+      shell: bash
+      env:
+        RCLONE_VERSION: v1.75.1
+        RCLONE_SHA256: 982b5aa772841168f8e380f139e9e787b2a105403e32b94da8676a0e1c0a13ab
+      run: |
+        if [ "$RUNNER_OS" != Linux ] || [ "$RUNNER_ARCH" != X64 ]; then
+          echo "::error::Linux(x64)のランナーで動かしてください: $RUNNER_OS $RUNNER_ARCH"
+          exit 1
+        fi
+        zip="$RUNNER_TEMP/rclone.zip"
+        curl -fsSL -o "$zip" "https://downloads.rclone.org/$RCLONE_VERSION/rclone-$RCLONE_VERSION-linux-amd64.zip"
+        echo "$RCLONE_SHA256  $zip" | sha256sum --check -
+        unzip -q -o -j "$zip" "*/rclone" -d "$RUNNER_TEMP/rclone-bin"
+        echo "RCLONE=$RUNNER_TEMP/rclone-bin/rclone" >> "$GITHUB_ENV"
+
+    - name: Drive に置く
+      shell: bash
+      env:
+        # rclone の設定はファイルを作らず環境変数で渡す(リモート名 gdrive)
+        RCLONE_CONFIG_GDRIVE_SCOPE: drive
+        RCLONE_CONFIG_GDRIVE_TOKEN: ${{ inputs.drive-token }}
+        PROJECT: ${{ inputs.project }}
+        APK: ${{ inputs.apk }}
+        VARIANT: ${{ inputs.variant }}
+        DESCRIPTION_FILE: ${{ inputs.description-file }}
+        ICON: ${{ inputs.icon }}
+        EXPECT_CERT: ${{ inputs.signing-cert-sha256 }}
+        DRIVE_FOLDER: ${{ inputs.drive-folder }}
+        FORCE: ${{ inputs.force }}
+      run: |
+        # 種類は drive。自己テスト(publish-apk-selftest.yml)だけ、ジョブの env で local にする
+        export RCLONE_CONFIG_GDRIVE_TYPE="${RCLONE_CONFIG_GDRIVE_TYPE:-drive}"
+        if [ -z "$RCLONE_CONFIG_GDRIVE_TOKEN" ]; then
+          echo "::error::drive-token が空(リポジトリの Secrets に RCLONE_DRIVE_TOKEN を登録する)"
+          exit 1
+        fi
+        args=(--project "$PROJECT" --apk "$APK" --variant "$VARIANT" --remote "gdrive:$DRIVE_FOLDER")
+        if [ -n "$DESCRIPTION_FILE" ]; then args+=(--description-file "$DESCRIPTION_FILE"); fi
+        if [ -n "$ICON" ]; then args+=(--icon "$ICON"); fi
+        if [ -n "$EXPECT_CERT" ]; then args+=(--expect-cert "$EXPECT_CERT"); fi
+        if [ "$FORCE" = "true" ]; then args+=(--force); fi
+        python3 "$GITHUB_ACTION_PATH/publish_drive.py" "${args[@]}"
