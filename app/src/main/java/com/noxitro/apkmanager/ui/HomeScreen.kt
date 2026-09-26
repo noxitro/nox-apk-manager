@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Inbox
@@ -39,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -67,6 +69,7 @@ fun HomeScreen(
     onReload: () -> Unit,
     onPickKey: () -> Unit,
     onCopied: () -> Unit,
+    onOpenGuide: () -> Unit,
     onFilter: (Filter) -> Unit,
     onUpdateAll: () -> Unit,
     onCancelBatch: () -> Unit,
@@ -91,7 +94,7 @@ fun HomeScreen(
             contentPadding = contentPadding,
             modifier = Modifier.fillMaxSize(),
         ) {
-            fullWidth(key = "hero") { Hero(state, onRefresh) }
+            fullWidth(key = "hero") { Hero(state, onRefresh, onOpenGuide) }
 
             fullWidth(key = "chips") {
                 Row(
@@ -120,7 +123,15 @@ fun HomeScreen(
             when (val sync = state.sync) {
                 is SyncState.Error -> if (state.entries.isEmpty()) {
                     fullWidth(key = "error") {
-                        ErrorBlock(sync, state.serviceAccountEmail, onRetry = onRefresh, onReload = onReload, onPickKey = onPickKey, onCopied = onCopied)
+                        ErrorBlock(
+                            sync,
+                            state.serviceAccountEmail,
+                            onRetry = onRefresh,
+                            onReload = onReload,
+                            onPickKey = onPickKey,
+                            onCopied = onCopied,
+                            onOpenGuide = onOpenGuide,
+                        )
                     }
                     return@LazyVerticalGrid
                 }
@@ -167,7 +178,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun Hero(state: HomeUiState, onRefresh: () -> Unit) {
+private fun Hero(state: HomeUiState, onRefresh: () -> Unit, onOpenGuide: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Column(modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -184,6 +195,9 @@ private fun Hero(state: HomeUiState, onRefresh: () -> Unit) {
                     SyncState.Idle -> ""
                 }
                 Text(sub, style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), color = scheme.onSurfaceVariant)
+            }
+            IconButton(onClick = onOpenGuide) {
+                Icon(Icons.AutoMirrored.Outlined.HelpOutline, contentDescription = "接続方法")
             }
             IconButton(onClick = onRefresh, enabled = state.sync !is SyncState.Loading) {
                 Icon(Icons.Default.Refresh, contentDescription = "Drive を読み直す")
@@ -341,6 +355,7 @@ private fun ErrorBlock(
     onReload: () -> Unit,
     onPickKey: () -> Unit,
     onCopied: () -> Unit,
+    onOpenGuide: () -> Unit,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -374,7 +389,7 @@ private fun ErrorBlock(
             // スマホ単体で完結する手順(ブラウザで鍵を作る → ファイルを選ぶ)。PC からの adb push も末尾に残す。
             error.needsKey -> {
                 Spacer(Modifier.height(20.dp))
-                Box(modifier = Modifier.widthIn(max = 480.dp)) { KeySetupGuide(onPickKey) }
+                Box(modifier = Modifier.widthIn(max = 480.dp)) { KeySetupGuide(onPickKey, onOpenGuide) }
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = onReload) { Text("もう一度読む") }
             }
@@ -383,10 +398,12 @@ private fun ErrorBlock(
                 Box(modifier = Modifier.widthIn(max = 480.dp)) { ShareGuide(serviceAccountEmail, onCopied) }
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = onRetry) { Text("もう一度読む") }
+                TextButton(onClick = onOpenGuide) { Text("接続方法を見る") }
             }
             else -> {
                 Spacer(Modifier.height(20.dp))
                 Button(onClick = onRetry) { Text("もう一度読む") }
+                TextButton(onClick = onOpenGuide) { Text("接続方法を見る") }
             }
         }
     }

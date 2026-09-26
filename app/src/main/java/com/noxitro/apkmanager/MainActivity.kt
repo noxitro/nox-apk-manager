@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +37,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.noxitro.apkmanager.ui.AppDetailSheet
+import com.noxitro.apkmanager.ui.ConnectionGuideScreen
 import com.noxitro.apkmanager.ui.HomeEvent
 import com.noxitro.apkmanager.ui.HomeScreen
 import com.noxitro.apkmanager.ui.HomeViewModel
@@ -57,6 +59,10 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 val snackbar = remember { SnackbarHostState() }
                 var tab by rememberSaveable { mutableStateOf(0) }
+                // 接続方法の画面。どのタブからでも開き、戻る操作で閉じる。
+                var showGuide by rememberSaveable { mutableStateOf(false) }
+                BackHandler(enabled = showGuide) { showGuide = false }
+                val onOpenGuide = { showGuide = true }
                 val scope = rememberCoroutineScope()
 
                 // 鍵(JSON)をファイルで選ばせる。スマホ単体で設定するときの入口(PC も adb も要らない)。
@@ -83,13 +89,13 @@ class MainActivity : ComponentActivity() {
                     navigationSuiteItems = {
                         item(
                             selected = tab == 0,
-                            onClick = { tab = 0 },
+                            onClick = { tab = 0; showGuide = false },
                             icon = { Icon(if (tab == 0) Icons.Filled.Apps else Icons.Outlined.Apps, contentDescription = null) },
                             label = { Text("アプリ") },
                         )
                         item(
                             selected = tab == 1,
-                            onClick = { tab = 1 },
+                            onClick = { tab = 1; showGuide = false },
                             icon = { Icon(if (tab == 1) Icons.Filled.Settings else Icons.Outlined.Settings, contentDescription = null) },
                             label = { Text("設定") },
                         )
@@ -106,14 +112,25 @@ class MainActivity : ComponentActivity() {
                         top = inner.calculateTopPadding(),
                         bottom = inner.calculateBottomPadding() + 16.dp,
                     )
-                    when (tab) {
-                        0 -> HomeScreen(
+                    when {
+                        showGuide -> ConnectionGuideScreen(
+                            state = state,
+                            contentPadding = listPadding,
+                            canInstallPackages = canInstall,
+                            onBack = { showGuide = false },
+                            onReload = viewModel::reload,
+                            onPickKey = onPickKey,
+                            onCopied = onCopied,
+                            onOpenInstallPermission = ::openInstallPermission,
+                        )
+                        tab == 0 -> HomeScreen(
                             state = state,
                             contentPadding = listPadding,
                             onRefresh = viewModel::refresh,
                             onReload = viewModel::reload,
                             onPickKey = onPickKey,
                             onCopied = onCopied,
+                            onOpenGuide = onOpenGuide,
                             onFilter = viewModel::setFilter,
                             onUpdateAll = viewModel::updateAll,
                             onCancelBatch = viewModel::cancelBatch,
@@ -131,6 +148,7 @@ class MainActivity : ComponentActivity() {
                             onReload = viewModel::reload,
                             onPickKey = onPickKey,
                             onCopied = onCopied,
+                            onOpenGuide = onOpenGuide,
                             onOpenInstallPermission = ::openInstallPermission,
                         )
                     }

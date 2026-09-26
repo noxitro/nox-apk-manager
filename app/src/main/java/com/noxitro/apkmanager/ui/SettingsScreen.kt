@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -22,7 +23,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.noxitro.apkmanager.BuildConfig
@@ -40,6 +40,7 @@ fun SettingsScreen(
     onReload: () -> Unit,
     onPickKey: () -> Unit,
     onCopied: () -> Unit,
+    onOpenGuide: () -> Unit,
     onOpenInstallPermission: () -> Unit,
 ) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -104,18 +105,9 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = muted,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "鍵はファイルで選ぶほか、PC から次を実行してアプリを開き直しても入れられます。",
-            style = MaterialTheme.typography.bodySmall,
-            color = muted,
-        )
-        Text(
-            "adb push <鍵>.json /sdcard/Android/data/com.noxitro.apkmanager/files/nox-drive-sa.json",
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            color = muted,
-        )
+        Spacer(Modifier.height(12.dp))
+        // 鍵の作り方・共有・PC からの入れ方・うまくいかないときは、すべて接続方法の画面にまとめてある
+        FilledTonalButton(onClick = onOpenGuide) { Text("接続方法を見る") }
         Spacer(Modifier.height(8.dp))
         Text(
             "Drive への書き込みや整理は PC 側の scripts/publish-apk.ps1 が担当します。",

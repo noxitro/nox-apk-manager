@@ -149,11 +149,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _state.update { it.copy(sync = error) }
             } catch (e: DriveException) {
-                // 403 は「共有されていない」がいちばん多い。鍵の問題と区別して言う。
-                val error = if (e.code == 403) {
-                    SyncState.Error("builds/ を読めません(HTTP 403)。Drive の builds/ をサービスアカウントに共有してください", needsShare = true)
-                } else {
-                    SyncState.Error("Drive の読み取りに失敗しました(HTTP ${e.code})")
+                // 403 は Drive API が無効なときにも出る。共有の問題と取り違えないよう先に見分ける。
+                val error = when {
+                    e.isApiDisabled -> SyncState.Error(
+                        "Drive API が有効になっていません。Google Cloud で、鍵を作ったプロジェクトの Google Drive API を有効にしてください",
+                    )
+                    e.code == 403 -> SyncState.Error(
+                        "builds/ を読めません(HTTP 403)。Drive の builds/ をサービスアカウントに共有してください",
+                        needsShare = true,
+                    )
+                    else -> SyncState.Error("Drive の読み取りに失敗しました(HTTP ${e.code})")
                 }
                 _state.update { it.copy(sync = error) }
             } catch (e: IOException) {
