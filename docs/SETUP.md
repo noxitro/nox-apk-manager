@@ -165,6 +165,7 @@ E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project photo
 - 説明文を変えるときは `-Description "..."`。`icon.png` を同じフォルダに置けば未インストールでもアイコンが出る。
 - 配布フォルダ全体の `meta.json` を作り直すなら `scripts\regen-meta.ps1`。
 - **機能を足したら `versionName` / `versionCode` を上げてから置く**。据え置くと同名で上書きされ、端末側も更新と認識しない。
+- PC で置く代わりに、`main` への push で GitHub Actions に置かせることもできる。手順は [CD.md](CD.md)。
 
 ---
 

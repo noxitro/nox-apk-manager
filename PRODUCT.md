@@ -35,8 +35,9 @@ Drive の `builds/` を端末から読み、インストール済みの版と比
 ## Operating Context
 
 - 配布元: マイドライブ直下 `builds/<project>/<project>-<versionName>-<debug|release>.apk`。
-  PC 側の `scripts/publish-apk.ps1` が APK を置き、同じフォルダに `meta.json`(package 名・版・variant・sha256・説明)と
-  任意の `icon.png` を書く。古いフォルダには `meta.json` が無いことがある。
+  PC 側の `scripts/publish-apk.ps1`(GitHub Actions からは `.github/workflows/publish-apk.yml`)が APK を置き、
+  同じフォルダに `meta.json`(package 名・版・variant・sha256・説明)と任意の `icon.png` を書く。
+  古いフォルダには `meta.json` が無いことがある。
 - 端末: Samsung Galaxy(One UI、ダークテーマ常用)を含む複数台。参考にしている体験は Samsung Good Lock の
   「更新ありを上段に束ねて全て更新」「行ごとにアイコン・名前・説明・更新ボタン」。
 - 更新の検知はアプリを開いた時だけ(バックグラウンド巡回・通知はしない)。
@@ -50,7 +51,7 @@ Drive の `builds/` を端末から読み、インストール済みの版と比
 - 端末の方が新しい(手元で直接入れた)場合はダウングレードとして区別し、黙って上書きしない。
 - `meta.json` が無いフォルダは、ファイル名から版と variant を推定して一覧に出す。package 名が分からないので
   端末と突き合わせられず「状態不明」。一度ダウンロードした APK から package 名を読んで記憶し、次回から比較できる。
-- Drive の読み取りは `drive.readonly` スコープ。書き込みはしない(整理は PC 側の責務)。
+- Drive の読み取りは `drive.readonly` スコープ。書き込みはしない(整理は PC 側と CI の責務)。
 - Drive を読むのはサービスアカウント。`builds/` をそのアドレスに閲覧者として共有しておく。
   秘密鍵は `adb push` で端末に入れる(端末側で文字入力は不要)。アプリ自身は debug 鍵で署名する。
 - 用語: **project**(builds/ 直下のフォルダ名)、**build**(1 つの APK)、**variant**(debug / release)。

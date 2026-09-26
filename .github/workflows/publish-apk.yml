@@ -1,0 +1,205 @@
+# Android アプリをテスト・ビルドして、Google Drive の builds/<project>/ に置く(nox-apk-manager から入れる)。
+# ほかのリポジトリから呼ぶ再利用ワークフロー。呼び出し方と Secrets の登録は docs/CD.md。
+#
+#   build:   テストと release ビルド(PC と同じ debug 鍵で署名)
+#   publish: Drive に APK・meta.json・icon.png を置く
+#
+# Drive のトークンは publish でだけ使う。build ではリポジトリのコード(Gradle のプラグインなど)が動き、
+# $GITHUB_ENV や $GITHUB_PATH を書き換えてあとのステップを乗っ取れるので、同じジョブに置かない。
+name: publish-apk
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: builds/ 直下のフォルダ名。APK のファイル名にも使う
+        type: string
+        required: true
+      gradle-tasks:
+        description: テストとビルドの Gradle タスク(スペース区切り)
+        type: string
+        required: true
+      apk:
+        description: ビルドした APK のパス(リポジトリのルートから)
+        type: string
+        required: true
+      variant:
+        description: release か debug
+        type: string
+        default: release
+      description-file:
+        description: 一覧に出す説明文のファイル(任意)
+        type: string
+        default: ""
+      icon:
+        description: 一覧に出すアイコンの PNG(任意)
+        type: string
+        default: ""
+      sdk-packages:
+        description: ビルドの前に入れる Android SDK のパッケージ(スペース区切り、任意)
+        type: string
+        default: ""
+      java-version:
+        description: ビルドに使う JDK
+        type: string
+        default: "21"
+      signing-cert-sha256:
+        description: 端末に入っている版の署名の SHA-256(任意)。Secrets の鍵がこれと違えば置く前に止める
+        type: string
+        default: ""
+      drive-folder:
+        description: マイドライブから見た builds/ の場所
+        type: string
+        default: builds
+      force:
+        description: 同じ versionCode の版が Drive にあっても置き直す
+        type: boolean
+        default: false
+    secrets:
+      DEBUG_KEYSTORE_BASE64:
+        description: PC の debug.keystore を Base64 にしたもの
+        required: true
+      RCLONE_DRIVE_TOKEN:
+        description: rclone authorize "drive" で作ったトークン
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: テストとビルド
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      signing-cert: ${{ steps.keystore.outputs.sha256 }}
+    steps:
+      - name: Secrets があるか確かめる
+        env:
+          # トークンの値はこのジョブに入れない(有無だけ見る)
+          HAS_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE_BASE64 != '' }}
+          HAS_TOKEN: ${{ secrets.RCLONE_DRIVE_TOKEN != '' }}
+        run: |
+          missing=""
+          [ "$HAS_KEYSTORE" = true ] || missing="$missing DEBUG_KEYSTORE_BASE64"
+          [ "$HAS_TOKEN" = true ] || missing="$missing RCLONE_DRIVE_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::error::リポジトリの Secrets に次を登録してください:$missing(nox-apk-manager の scripts/set-ci-secrets.ps1 で登録できる)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Android SDK を用意する
+        env:
+          SDK_PACKAGES: ${{ inputs.sdk-packages }}
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          read -ra packages <<< "$SDK_PACKAGES"
+          if [ "${#packages[@]}" -gt 0 ]; then
+            "$sdkmanager" --install "${packages[@]}" > /dev/null
+          fi
+
+      # ほかの自作アプリと同じ鍵で署名するため、PC の debug.keystore を使う
+      # (各アプリの build.gradle.kts で、release も debug 鍵で署名する)
+      - name: 署名鍵を置く
+        id: keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+          EXPECTED_SHA256: ${{ inputs.signing-cert-sha256 }}
+        run: |
+          keystore="${ANDROID_USER_HOME:-$HOME/.android}/debug.keystore"
+          mkdir -p "$(dirname "$keystore")"
+          if ! printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$keystore"; then
+            echo "::error::DEBUG_KEYSTORE_BASE64 が Base64 として読めない"
+            exit 1
+          fi
+          sha256=$(keytool -list -v -keystore "$keystore" -storepass android -alias androiddebugkey 2>/dev/null \
+            | sed -n 's/.*SHA256: //p' | head -n 1 | tr -d ':' | tr 'A-F' 'a-f') || true
+          if [ -z "$sha256" ]; then
+            echo "::error::DEBUG_KEYSTORE_BASE64 が debug 鍵として読めない(PC の debug.keystore を Base64 にしたものか確かめる)"
+            exit 1
+          fi
+          expected=$(printf '%s' "$EXPECTED_SHA256" | tr -d ': ' | tr 'A-F' 'a-f')
+          if [ -n "$expected" ] && [ "$expected" != "$sha256" ]; then
+            echo "::error::Secrets の鍵が signing-cert-sha256 と違う(端末の版に上書きできない): $sha256"
+            exit 1
+          fi
+          echo "debug key: $sha256"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+
+      - name: テストとビルド
+        env:
+          GRADLE_TASKS: ${{ inputs.gradle-tasks }}
+        run: |
+          read -ra tasks <<< "$GRADLE_TASKS"
+          chmod +x ./gradlew
+          ./gradlew "${tasks[@]}"
+
+      - name: APK を publish に渡す
+        env:
+          APK: ${{ inputs.apk }}
+        run: |
+          if [ ! -f "$APK" ]; then
+            echo "::error::APK が無い(apk の指定とビルドの出力先を確かめる): $APK"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/publish"
+          cp -p "$APK" "$RUNNER_TEMP/publish/app.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: publish-apk-${{ inputs.project }}
+          path: ${{ runner.temp }}/publish/app.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Drive に置く
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # 同じアプリの meta.json を同時に書き換えないよう、1 つずつ置く
+    concurrency:
+      group: publish-apk-${{ inputs.project }}
+      cancel-in-progress: false
+    steps:
+      # 説明文とアイコンを読むだけ。このジョブではリポジトリのコードを動かさない
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # APK の署名を確かめる apksigner に使う
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: publish-apk-${{ inputs.project }}
+          path: ${{ runner.temp }}/publish
+
+      # APK が build で置いた鍵で署名されているかも確かめてから置く
+      - name: Drive に置く
+        uses: noxitro/nox-apk-manager/.github/actions/publish-apk@main
+        with:
+          project: ${{ inputs.project }}
+          apk: ${{ runner.temp }}/publish/app.apk
+          variant: ${{ inputs.variant }}
+          description-file: ${{ inputs.description-file }}
+          icon: ${{ inputs.icon }}
+          signing-cert-sha256: ${{ needs.build.outputs.signing-cert }}
+          drive-folder: ${{ inputs.drive-folder }}
+          drive-token: ${{ secrets.RCLONE_DRIVE_TOKEN }}
+          force: ${{ inputs.force }}

@@ -12,7 +12,7 @@ Play ストアにも F-Droid にも出さないアプリを、ストア相当の
 ```
 G:\マイドライブ\builds\<project>\
   <project>-<versionName>-<debug|release>.apk   … 版ごとに残す(古い版も入れ直せる)
-  meta.json                                      … package 名・版・variant・sha256・説明。publish-apk.ps1 が書く
+  meta.json                                      … package 名・版・variant・sha256・説明。publish-apk.ps1(CI では publish-apk ワークフロー)が書く
   icon.png                                       … 任意。未インストールの行に出す
 ```
 
@@ -28,6 +28,13 @@ E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project <proj
   package 名は分からないので端末と突き合わせられず「状態不明」。一度導入すると次回から比較できる。
 - 全フォルダの `meta.json` を作り直す: `scripts\regen-meta.ps1`。
 
+## 配布の規約(GitHub Actions)
+
+各リポジトリの `main` への push で、テスト → release ビルド → `builds/<project>/` への配置まで行う共通ワークフロー
+(`.github/workflows/publish-apk.yml`)を用意している。置くものは `publish-apk.ps1` と同じ。
+呼び出す側は yml を 1 つ置き、`scripts\set-ci-secrets.ps1 -Repo <リポジトリ名>` で Secrets を登録するだけ。
+手順・入力・トークンの扱いは [docs/CD.md](docs/CD.md)。
+
 ## 端末側
 
 - 起動時に Drive を読む(バックグラウンド巡回・通知はしない)。
@@ -35,7 +42,7 @@ E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project <proj
 - debug と release は署名が違うと相互に上書きできない。失敗時は理由と次の一手を文で出す
   (署名不一致 → アンインストールが必要 / 端末の方が新しい → ダウングレード不可)。
 - インストールは PackageInstaller セッション。OS の確認ダイアログは毎回出る。「全て更新」は 1 件ずつ順に進む。
-- Drive は読み取り専用(`drive.readonly`)。整理・書き込みは PC 側の責務。
+- Drive は読み取り専用(`drive.readonly`)。整理・書き込みは PC 側(と CI)の責務。
 
 初回のサービスアカウント作成・`builds/` の共有・端末への鍵の投入は [docs/SETUP.md](docs/SETUP.md)。
 Meta Quest 3 への移植の検証手順は [docs/QUEST.md](docs/QUEST.md)。
@@ -76,7 +83,8 @@ app/src/main/java/com/noxitro/apkmanager/
   ui/HomeViewModel.kt       … 同期・インストール・一括更新の進行
   ui/HomeScreen.kt          … ヒーロー帯 / チップ / 「更新あり N 件」の板 / 導入済み・未導入
   ui/AppRow.kt, AppDetailSheet.kt, SettingsScreen.kt
-scripts/                    … publish-apk.ps1 / regen-meta.ps1 / apk-meta.ps1(PC 側の配布)
+scripts/                    … publish-apk.ps1 / regen-meta.ps1 / apk-meta.ps1(PC 側の配布)、set-ci-secrets.ps1(CI の Secrets)
+.github/actions/publish-apk … CI から builds/ に置く Action。.github/workflows/publish-apk.yml から使う
 ```
 
 ## 法的な位置づけ
