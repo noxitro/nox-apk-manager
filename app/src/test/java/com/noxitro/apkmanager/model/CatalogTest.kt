@@ -23,7 +23,7 @@ class CatalogTest {
     @Test
     fun rejectsNamesOutsideTheConvention() {
         assertNull(parseApkFileName("app-debug.apk"))                    // 版が無い
-        assertNull(parseApkFileName("booklog-app-debug.apk"))            // 版が無い
+        assertNull(parseApkFileName("sample-app-debug.apk"))             // 版が無い
         assertNull(parseApkFileName("manualrotate-0.1.0-debug-20260730-0251.apk")) // 末尾が variant でない
         assertNull(parseApkFileName("meta.json"))
         assertNull(parseApkFileName("0.1.0-debug.apk"))                  // 名前が無い

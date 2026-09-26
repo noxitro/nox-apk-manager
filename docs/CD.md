@@ -124,7 +124,7 @@ jobs:
 
 ### 独自の鍵で署名するアプリ
 
-book-log のように release 専用の鍵で署名するアプリは、ビルドと署名を自分のジョブで行い、APK を別のジョブに渡して Action だけを呼ぶ。
+release 専用の鍵で署名するアプリは、ビルドと署名を自分のジョブで行い、APK を別のジョブに渡して Action だけを呼ぶ。
 トークンをビルドと同じジョブに入れないため(下の「トークン」)。ランナーは `ubuntu-latest`(Android SDK・Java・Python 3 入り)。
 
 ```yaml
@@ -148,7 +148,7 @@ jobs:
           name: apk
       - uses: noxitro/nox-apk-manager/.github/actions/publish-apk@main
         with:
-          project: book-log
+          project: <project>
           apk: app-release.apk
           drive-token: ${{ secrets.RCLONE_DRIVE_TOKEN }}
 ```
