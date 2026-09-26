@@ -8,6 +8,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.noxitro.apkmanager.ApkManagerApplication
+import com.noxitro.apkmanager.auth.PushedKey
 import com.noxitro.apkmanager.auth.ServiceAccountAuth
 import com.noxitro.apkmanager.data.CatalogRepository
 import com.noxitro.apkmanager.drive.DriveException
@@ -129,7 +130,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(sync = SyncState.Ready(nowLabel()), entries = entries) }
                 loadIcons(entries)
             } catch (e: ServiceAccountAuth.MissingKey) {
-                _state.update { it.copy(sync = SyncState.Error(e.message.orEmpty(), needsKey = true)) }
+                val message = missingKeyMessage(e.message.orEmpty(), container.lastKeyImport)
+                _state.update { it.copy(sync = SyncState.Error(message, needsKey = true)) }
             } catch (e: CatalogRepository.BuildsFolderNotFound) {
                 _state.update { it.copy(sync = SyncState.Error(e.message.orEmpty())) }
             } catch (e: DriveException) {
@@ -146,6 +148,28 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(sync = SyncState.Error("読み込みに失敗しました: ${e.message ?: e.javaClass.simpleName}")) }
             }
         }
+    }
+
+    /**
+     * 鍵が無いときに、push した鍵がなぜ取り込めなかったかを添える。
+     * 「未設定」だけでは、push していないのか・場所や名前が違うのか・中身が違うのかが分からない。
+     */
+    private fun missingKeyMessage(base: String, pushed: PushedKey.Result?): String = when (pushed) {
+        is PushedKey.Result.Invalid -> "${pushed.file.name} を取り込めませんでした: ${pushed.reason}"
+        is PushedKey.Result.NotFound -> buildString {
+            append(base)
+            val dir = pushed.dir
+            if (dir == null) {
+                append("\n端末のストレージを読めません(外部ストレージが使えない状態です)")
+            } else {
+                append("\n探した場所: ").append(dir.path)
+                append(
+                    if (pushed.others.isEmpty()) "(空)"
+                    else "\nあったもの: " + pushed.others.take(8).joinToString(", "),
+                )
+            }
+        }
+        is PushedKey.Result.Found, null -> base
     }
 
     /** 鍵を入れ直した / 共有し直した後に、もう一度読む。 */

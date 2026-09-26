@@ -59,7 +59,7 @@ class ServiceAccountAuth(
 
     /** 鍵の持ち主。設定画面に出す。鍵が無ければ null。 */
     suspend fun clientEmail(): String? =
-        keyJsonProvider()?.let { runCatching { json.decodeFromString<KeyJson>(it).clientEmail }.getOrNull() }
+        keyJsonProvider()?.let { runCatching { json.decodeFromString<KeyJson>(it.trimStart('\uFEFF')).clientEmail }.getOrNull() }
 
     /**
      * アクセストークン。期限内ならキャッシュを返す。
@@ -72,7 +72,7 @@ class ServiceAccountAuth(
             cachedToken?.let { if (now < expiresAtMillis - 60_000) return it }
         }
         val raw = keyJsonProvider() ?: throw MissingKey()
-        val key = runCatching { json.decodeFromString<KeyJson>(raw) }.getOrElse {
+        val key = runCatching { json.decodeFromString<KeyJson>(raw.trimStart('\uFEFF')) }.getOrElse {
             throw IOException("サービスアカウントの JSON を読めません(client_email / private_key がありません)")
         }
         val fetched = requestToken(key)
