@@ -5,7 +5,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -38,6 +41,7 @@ import com.noxitro.apkmanager.ui.HomeScreen
 import com.noxitro.apkmanager.ui.HomeViewModel
 import com.noxitro.apkmanager.ui.SettingsScreen
 import com.noxitro.apkmanager.ui.theme.NoxApkManagerTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -53,6 +57,15 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 val snackbar = remember { SnackbarHostState() }
                 var tab by rememberSaveable { mutableStateOf(0) }
+                val scope = rememberCoroutineScope()
+
+                // 鍵(JSON)をファイルで選ばせる。スマホ単体で設定するときの入口(PC も adb も要らない)。
+                // JSON の MIME はファイルアプリによってまちまちなので絞らず、中身で確かめる。
+                val pickKey = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                    uri?.let(viewModel::importKey)
+                }
+                val onPickKey = { pickKey.launch(arrayOf("*/*")) }
+                val onCopied: () -> Unit = { scope.launch { snackbar.showSnackbar("コピーしました") } }
 
                 LaunchedEffect(Unit) {
                     viewModel.events.collect { event ->
@@ -99,6 +112,8 @@ class MainActivity : ComponentActivity() {
                             contentPadding = listPadding,
                             onRefresh = viewModel::refresh,
                             onReload = viewModel::reload,
+                            onPickKey = onPickKey,
+                            onCopied = onCopied,
                             onFilter = viewModel::setFilter,
                             onUpdateAll = viewModel::updateAll,
                             onCancelBatch = viewModel::cancelBatch,
@@ -114,6 +129,8 @@ class MainActivity : ComponentActivity() {
                             canInstallPackages = canInstall,
                             onVariant = viewModel::setPreferredVariant,
                             onReload = viewModel::reload,
+                            onPickKey = onPickKey,
+                            onCopied = onCopied,
                             onOpenInstallPermission = ::openInstallPermission,
                         )
                     }

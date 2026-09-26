@@ -2,6 +2,8 @@ package com.noxitro.apkmanager.ui
 
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
@@ -64,8 +66,11 @@ sealed interface SyncState {
     data object Idle : SyncState
     data object Loading : SyncState
     data class Ready(val syncedAtLabel: String) : SyncState
-    /** [needsKey] が true なら、サービスアカウントの鍵がまだ端末に入っていない。 */
-    data class Error(val message: String, val needsKey: Boolean = false) : SyncState
+    /**
+     * [needsKey] が true なら、サービスアカウントの鍵がまだ端末に入っていない。
+     * [needsShare] が true なら、鍵はあるが builds/ がサービスアカウントに共有されていない。
+     */
+    data class Error(val message: String, val needsKey: Boolean = false, val needsShare: Boolean = false) : SyncState
 }
 
 data class HomeUiState(
@@ -133,15 +138,24 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 val message = missingKeyMessage(e.message.orEmpty(), container.lastKeyImport)
                 _state.update { it.copy(sync = SyncState.Error(message, needsKey = true)) }
             } catch (e: CatalogRepository.BuildsFolderNotFound) {
-                _state.update { it.copy(sync = SyncState.Error(e.message.orEmpty())) }
+                // サービスアカウントから builds が見えない = 共有していないことが多い(名前違いもあり得る)
+                val error = if (container.isLocalSource) {
+                    SyncState.Error(e.message.orEmpty())
+                } else {
+                    SyncState.Error(
+                        "builds フォルダが見えません。サービスアカウントに共有されていないか、フォルダ名が builds ではありません",
+                        needsShare = true,
+                    )
+                }
+                _state.update { it.copy(sync = error) }
             } catch (e: DriveException) {
                 // 403 は「共有されていない」がいちばん多い。鍵の問題と区別して言う。
-                val message = if (e.code == 403) {
-                    "builds/ を読めません(HTTP 403)。Drive の builds/ をサービスアカウントに共有してください"
+                val error = if (e.code == 403) {
+                    SyncState.Error("builds/ を読めません(HTTP 403)。Drive の builds/ をサービスアカウントに共有してください", needsShare = true)
                 } else {
-                    "Drive の読み取りに失敗しました(HTTP ${e.code})"
+                    SyncState.Error("Drive の読み取りに失敗しました(HTTP ${e.code})")
                 }
-                _state.update { it.copy(sync = SyncState.Error(message)) }
+                _state.update { it.copy(sync = error) }
             } catch (e: IOException) {
                 _state.update { it.copy(sync = SyncState.Error("通信に失敗しました: ${e.message ?: e.javaClass.simpleName}")) }
             } catch (e: Exception) {
@@ -170,6 +184,41 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         is PushedKey.Result.Found, null -> base
+    }
+
+    /**
+     * ファイル選択で選ばれた鍵を取り込む(スマホ単体での設定。PC も adb も要らない)。
+     *
+     * 取り込めたら、端末内に置かれた元ファイル(ダウンロード等)は消す。秘密鍵を共有ストレージに残さないため
+     * (adb push の取り込みと同じ方針)。クラウド上のファイル(Drive 等)は唯一の控えかもしれないので消さない。
+     */
+    fun importKey(uri: Uri) {
+        viewModelScope.launch {
+            val resolver = getApplication<Application>().contentResolver
+            val bytes = withContext(Dispatchers.IO) {
+                runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+            }
+            if (bytes == null) {
+                _events.tryEmit(HomeEvent.Snack("選んだファイルを読めませんでした"))
+                return@launch
+            }
+            val json = PushedKey.parse(bytes).getOrElse {
+                _events.tryEmit(HomeEvent.Snack("鍵として使えません: ${it.message}"))
+                return@launch
+            }
+            container.prefs.setServiceAccountKey(json)
+            container.auth.invalidate()
+            val deleted = uri.authority in LOCAL_DOCUMENT_AUTHORITIES && withContext(Dispatchers.IO) {
+                runCatching { DocumentsContract.deleteDocument(resolver, uri) }.getOrDefault(false)
+            }
+            _events.tryEmit(
+                HomeEvent.Snack(
+                    if (deleted) "鍵を取り込みました(元のファイルは消しました)"
+                    else "鍵を取り込みました。元のファイルは不要なので消しておいてください",
+                ),
+            )
+            refresh()
+        }
     }
 
     /** 鍵を入れ直した / 共有し直した後に、もう一度読む。 */
@@ -433,6 +482,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun nowLabel(): String = SimpleDateFormat("HH:mm", Locale.JAPAN).format(Date())
 }
+
+/** 端末内のファイルを指す DocumentsProvider。ここから選んだ鍵は取り込み後に消す。 */
+private val LOCAL_DOCUMENT_AUTHORITIES = setOf(
+    "com.android.providers.downloads.documents",
+    "com.android.externalstorage.documents",
+    "com.android.providers.media.documents",
+)
 
 fun formatSize(bytes: Long): String = when {
     bytes >= 1_000_000 -> String.format(Locale.JAPAN, "%.1f MB", bytes / 1_000_000.0)

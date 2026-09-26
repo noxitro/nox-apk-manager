@@ -44,7 +44,8 @@ E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project <proj
 - インストールは PackageInstaller セッション。OS の確認ダイアログは毎回出る。「全て更新」は 1 件ずつ順に進む。
 - Drive は読み取り専用(`drive.readonly`)。整理・書き込みは PC 側(と CI)の責務。
 
-初回の設定は `pwsh scripts\setup-gcp.ps1`(Google 側)と `pwsh scripts\setup-device.ps1`(端末側)の 2 つで済む。
+初回の設定はスマホ単体で完結する(アプリの画面の手順に沿ってブラウザで鍵を作り、ファイルで選ぶ)。
+PC からなら `pwsh scripts\setup-gcp.ps1`(Google 側)と `pwsh scripts\setup-device.ps1`(端末側)の 2 つ。
 中身と手作業の手順は [docs/SETUP.md](docs/SETUP.md)。
 Meta Quest 3 への移植の検証手順は [docs/QUEST.md](docs/QUEST.md)。
 

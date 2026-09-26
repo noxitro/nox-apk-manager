@@ -79,6 +79,13 @@ class PushedKeyTest {
         assertEquals(listOf("builds/", "nox-drive-sa.json.txt"), r.others)
     }
 
+    @Test
+    fun `ファイル選択で渡された中身を確かめる`() {
+        assertEquals(key, PushedKey.parse(key.toByteArray()).getOrNull())
+        assertEquals("中身が空です", PushedKey.parse(ByteArray(0)).exceptionOrNull()?.message)
+        assertTrue(PushedKey.parse("""{"web":{}}""".toByteArray()).exceptionOrNull()!!.message!!.contains("OAuth"))
+    }
+
     private companion object {
         const val NAME = "nox-drive-sa.json"
     }

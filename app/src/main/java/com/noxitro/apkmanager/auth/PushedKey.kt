@@ -54,10 +54,18 @@ object PushedKey {
         val bytes = runCatching { file.readBytes() }.getOrElse {
             return Result.Invalid(file, "ファイルを読めません(${it.message ?: it.javaClass.simpleName})")
         }
-        if (bytes.isEmpty()) return Result.Invalid(file, "中身が空です")
+        return parse(bytes).fold(onSuccess = { Result.Found(file, it) }, onFailure = { Result.Invalid(file, it.message.orEmpty()) })
+    }
+
+    /**
+     * 鍵の中身を確かめ、使えるなら文字コードを直した JSON を返す。使えないなら理由をメッセージに持つ失敗。
+     * ファイル選択(スマホ単体での取り込み)からも使う。
+     */
+    fun parse(bytes: ByteArray): kotlin.Result<String> {
+        if (bytes.isEmpty()) return kotlin.Result.failure(IllegalArgumentException("中身が空です"))
         val text = decode(bytes)
-        val reason = problemOf(text) ?: return Result.Found(file, text)
-        return Result.Invalid(file, reason)
+        val reason = problemOf(text) ?: return kotlin.Result.success(text)
+        return kotlin.Result.failure(IllegalArgumentException(reason))
     }
 
     /**
