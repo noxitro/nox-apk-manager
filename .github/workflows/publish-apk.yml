@@ -112,14 +112,17 @@ jobs:
 
       # ほかの自作アプリと同じ鍵で署名するため、PC の debug.keystore を使う
       # (各アプリの build.gradle.kts で、release も debug 鍵で署名する)
+      # AGP は ANDROID_USER_HOME が無いと、$XDG_CONFIG_HOME/.android があればそちらを ~/.android より先に使い、
+      # 鍵が無ければ新しく作って署名してしまう(GitHub のランナーはこれに当たる)。置いた場所を ANDROID_USER_HOME で渡す
       - name: 署名鍵を置く
         id: keystore
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
           EXPECTED_SHA256: ${{ inputs.signing-cert-sha256 }}
         run: |
-          keystore="${ANDROID_USER_HOME:-$HOME/.android}/debug.keystore"
-          mkdir -p "$(dirname "$keystore")"
+          dir="${ANDROID_USER_HOME:-$HOME/.android}"
+          keystore="$dir/debug.keystore"
+          mkdir -p "$dir"
           if ! printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$keystore"; then
             echo "::error::DEBUG_KEYSTORE_BASE64 が Base64 として読めない"
             exit 1
@@ -135,8 +138,9 @@ jobs:
             echo "::error::Secrets の鍵が signing-cert-sha256 と違う(端末の版に上書きできない): $sha256"
             exit 1
           fi
-          echo "debug key: $sha256"
+          echo "debug key: $sha256 ($keystore)"
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "ANDROID_USER_HOME=$dir" >> "$GITHUB_ENV"
 
       - name: テストとビルド
         env:
@@ -146,12 +150,20 @@ jobs:
           chmod +x ./gradlew
           ./gradlew "${tasks[@]}"
 
-      - name: APK を publish に渡す
+      - name: 署名を確かめて publish に渡す
         env:
           APK: ${{ inputs.apk }}
+          KEY_SHA256: ${{ steps.keystore.outputs.sha256 }}
         run: |
           if [ ! -f "$APK" ]; then
             echo "::error::APK が無い(apk の指定とビルドの出力先を確かめる): $APK"
+            exit 1
+          fi
+          apksigner=$(find "$ANDROID_HOME/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)
+          actual=$("$apksigner" verify --print-certs "$APK" 2>/dev/null \
+            | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1) || true
+          if [ "$actual" != "$KEY_SHA256" ]; then
+            echo "::error::APK が Secrets の debug 鍵で署名されていない(release の signingConfig が debug か確かめる): APK ${actual:-未署名} / 鍵 $KEY_SHA256"
             exit 1
           fi
           mkdir -p "$RUNNER_TEMP/publish"
