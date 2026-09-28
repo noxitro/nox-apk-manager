@@ -45,6 +45,21 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests {
+            // Robolectric で Compose の画面を JVM 上で描くのに、テーマやマニフェストのリソースが要る。
+            isIncludeAndroidResources = true
+            all {
+                // JDK 21(Android Studio 同梱の JBR)では、Robolectric が FileDescriptor の内部に触れられずに
+                // 「Failed to interact with raw FileDescriptor internals」で落ちる。JDK 17 では無くても動く。
+                it.jvmArgs(
+                    "--add-opens=java.base/java.io=ALL-UNNAMED",
+                    "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+                )
+            }
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -79,6 +94,10 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockwebserver)
+    // 画面のテストを、エミュレータを使わずに JVM 上で走らせる(push のたびの単体テストに乗る)。
+    testImplementation(composeBom)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.robolectric)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)

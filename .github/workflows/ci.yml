@@ -54,7 +54,7 @@ jobs:
         run: |
           python3 .github/scripts/check-test-results.py \
             app/build/test-results/testDebugUnitTest \
-            --min 12 --label "単体テスト"
+            --min 17 --label "単体テスト"
 
       - name: APK とレポートを残す
         if: always()
