@@ -97,12 +97,15 @@ fun AppRow(
                 }
                 Spacer(Modifier.height(2.dp))
                 VersionLine(entry)
-                // 自分自身は「全て更新」から外してある(HomeViewModel.updateAll)。押す前に分かるように書いておく。
+                // 自分自身の更新はプロセスが入れ替わる。そのため「全て更新」からは外してあり
+                // (HomeViewModel.updateAll、板の件数にも注記が出る)、ここでは押した後に何が起きるかを言う。
                 if (entry.isSelf && entry.status is AppStatus.UpdateAvailable) {
                     Text(
-                        text = "このアプリ自身なので、「全て更新」には含めず個別に更新します",
+                        text = "更新するとこのアプリは一度終了します",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -117,6 +120,7 @@ fun AppRow(
             if (job != null) {
                 JobLine(
                     job = job,
+                    label = entry.label,
                     batchRunning = batchRunning,
                     onDismiss = onDismissJob,
                     onReopenConfirm = onReopenConfirm,
@@ -208,6 +212,7 @@ private fun RowAction(
 @Composable
 private fun JobLine(
     job: JobState,
+    label: String,
     batchRunning: Boolean,
     onDismiss: () -> Unit,
     onReopenConfirm: () -> Unit,
@@ -263,16 +268,19 @@ private fun JobLine(
             Spacer(Modifier.height(4.dp))
             // 一括更新の最中は OS のダイアログが取り違えられるので押させない。
             if (job.canUninstall) {
+                // 読み上げではどの行のボタンか分かるように、アプリ名を添える
                 TextButton(
                     onClick = onUninstall,
                     enabled = !batchRunning,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.semantics { contentDescription = "$label をアンインストール" },
                 ) { Text("アンインストール") }
             } else {
                 TextButton(
                     onClick = onRetry,
                     enabled = !batchRunning,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.semantics { contentDescription = "$label を再試行" },
                 ) { Text("再試行") }
             }
         }

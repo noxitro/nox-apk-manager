@@ -204,25 +204,39 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun uninstall(entry: AppEntry) {
-        val pkg = entry.packageName ?: return
-        @Suppress("DEPRECATION")
-        val intent = Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:$pkg"))
-        _events.tryEmit(HomeEvent.StartActivity(intent))
+        uninstallPackage(entry.packageName ?: return)
     }
 
     /** 失敗した行の「アンインストール」。APK から読んだ package 名を使う(meta.json が無い行でも効くように)。 */
     fun uninstallFailed(project: String) {
-        val pkg = _state.value.jobs[project]?.targetPackage ?: return
+        uninstallPackage(_state.value.jobs[project]?.targetPackage ?: return)
+    }
+
+    private fun uninstallPackage(pkg: String) {
         @Suppress("DEPRECATION")
         val intent = Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:$pkg"))
         _events.tryEmit(HomeEvent.StartActivity(intent))
     }
 
-    /** 失敗した行の「再試行」。前回と同じビルドを入れ直す。 */
+    /**
+     * 失敗した行の「再試行」。前回と同じビルドを入れ直す。
+     *
+     * ただし、一覧を読み直してそのビルドが Drive から消えた、あるいは設定で variant を切り替えて
+     * 行が別の variant を指すようになったときは、行に出ているビルド([AppEntry.selected])を入れる。
+     * 行に書いてあるものと違う物を入れないため。
+     */
     fun retry(project: String) {
         val s = _state.value
-        val entry = s.entries.firstOrNull { it.project == project } ?: return
-        install(entry, s.jobs[project]?.build ?: entry.selected)
+        val entry = s.entries.firstOrNull { it.project == project }
+        if (entry == null) {
+            _events.tryEmit(HomeEvent.Snack("$project は Drive の builds/ に見当たりません。一覧を読み直してください"))
+            return
+        }
+        val previous = s.jobs[project]?.build
+        val stillValid = previous != null &&
+            entry.builds.any { it.driveFileId == previous.driveFileId } &&
+            previous.variant == entry.selected?.variant
+        install(entry, if (stillValid) previous else entry.selected)
     }
 
     /**
@@ -292,6 +306,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 val all = _state.value.updates
                 val (self, others) = all.partition { it.isSelf }
                 for (entry in others) {
+                    // 行の「更新」や「再試行」で既に入れている最中の行には重ねない
+                    if (_state.value.jobs[entry.project]?.isActive == true) continue
                     val build = entry.selected ?: continue
                     runInstall(entry, build)
                 }

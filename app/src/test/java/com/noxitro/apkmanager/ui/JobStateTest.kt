@@ -12,7 +12,7 @@ class JobStateTest {
             stage = JobState.Stage.FAILED,
             message = "失敗",
             targetPackage = targetPackage,
-            build = if (withBuild) build() else null,
+            build = if (withBuild) testBuild() else null,
             needsUninstall = needsUninstall,
         )
 
@@ -44,7 +44,7 @@ class JobStateTest {
     @Test
     fun `進行中と完了にはどちらも出さない`() {
         for (stage in listOf(JobState.Stage.DOWNLOADING, JobState.Stage.INSTALLING, JobState.Stage.WAITING_USER, JobState.Stage.DONE)) {
-            val job = JobState(stage = stage, message = "", targetPackage = "com.noxitro.a", build = build(), needsUninstall = true)
+            val job = JobState(stage = stage, message = "", targetPackage = "com.noxitro.a", build = testBuild(), needsUninstall = true)
             assertFalse("$stage", job.canUninstall)
             assertFalse("$stage", job.canRetry)
         }

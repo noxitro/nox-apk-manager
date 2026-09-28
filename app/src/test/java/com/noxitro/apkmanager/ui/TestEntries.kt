@@ -7,7 +7,7 @@ import com.noxitro.apkmanager.model.InstalledInfo
 import com.noxitro.apkmanager.model.Variant
 
 /** 画面のテストで使う行。値は実在の配布フォルダの形に合わせてある。 */
-internal fun build(versionName: String = "0.6.0", versionCode: Long = 6) = ApkBuild(
+internal fun testBuild(versionName: String = "0.6.0", versionCode: Long = 6) = ApkBuild(
     driveFileId = "file-$versionName",
     fileName = "photo-viewer-$versionName-release.apk",
     variant = Variant.RELEASE,
@@ -20,7 +20,7 @@ internal fun build(versionName: String = "0.6.0", versionCode: Long = 6) = ApkBu
 
 /** Drive の方が新しい(「更新あり」の板に入る)行。 */
 internal fun updatable(project: String, label: String = project, isSelf: Boolean = false): AppEntry {
-    val latest = build()
+    val latest = testBuild()
     return AppEntry(
         project = project,
         folderId = "folder-$project",

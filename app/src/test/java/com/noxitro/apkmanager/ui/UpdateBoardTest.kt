@@ -2,8 +2,10 @@ package com.noxitro.apkmanager.ui
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.noxitro.apkmanager.model.AppEntry
@@ -56,11 +58,11 @@ class UpdateBoardTest {
         }
     }
 
-    private fun failed(needsUninstall: Boolean) = JobState(
+    private fun failed(needsUninstall: Boolean, project: String = "photo") = JobState(
         stage = JobState.Stage.FAILED,
         message = if (needsUninstall) "署名が違うので上書きできません" else "ダウンロードに失敗: timeout",
-        targetPackage = "com.noxitro.photo",
-        build = build(),
+        targetPackage = "com.noxitro.$project",
+        build = testBuild(),
         needsUninstall = needsUninstall,
     )
 
@@ -88,18 +90,22 @@ class UpdateBoardTest {
     fun `一括更新の最中は失敗した行のボタンを押せない`() {
         show(
             listOf(updatable("photo"), updatable("camera")),
-            jobs = mapOf("photo" to failed(needsUninstall = false)),
+            jobs = mapOf(
+                "photo" to failed(needsUninstall = false),
+                "camera" to failed(needsUninstall = true, project = "camera"),
+            ),
             batchRunning = true,
         )
 
         compose.onNodeWithText("再試行").assertIsNotEnabled()
+        compose.onNodeWithText("アンインストール").assertIsNotEnabled()
     }
 
     @Test
-    fun `自分自身の行には全て更新に含めないことを書き添える`() {
+    fun `自分自身の行には更新で終了することを、板には個別に更新することを書き添える`() {
         show(listOf(updatable("photo"), updatable("apkmanager", label = "Nox APK Manager", isSelf = true)))
 
-        compose.onNodeWithText("このアプリ自身なので", substring = true).assertExists()
+        compose.onNodeWithText("更新するとこのアプリは一度終了します").assertExists()
         compose.onNodeWithText("(うち 1 件は個別に更新)", substring = true).assertExists()
         compose.onNodeWithText("全て更新").assertIsEnabled()
     }
@@ -109,7 +115,8 @@ class UpdateBoardTest {
         show(listOf(updatable("apkmanager", label = "Nox APK Manager", isSelf = true)))
 
         compose.onNodeWithText("全て更新").assertDoesNotExist()
-        // 行の「更新」からは入れられる
+        // 行の「更新」からは入れられる(行は 1 つなので「更新」ボタンも 1 つ)
+        compose.onAllNodesWithText("更新").assertCountEquals(1)
         compose.onNodeWithText("更新").assertIsEnabled()
         compose.onNodeWithText("個別に更新)", substring = true).assertDoesNotExist()
     }
