@@ -34,6 +34,7 @@ E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project <proj
 (`.github/workflows/publish-apk.yml`)を用意している。置くものは `publish-apk.ps1` と同じ。
 呼び出す側は yml を 1 つ置き、`scripts\set-ci-secrets.ps1 -Repo <リポジトリ名>` で Secrets を登録するだけ。
 手順・入力・トークンの扱いは [docs/CD.md](docs/CD.md)。
+このアプリ自身も同じ仕組みで配布する(`.github/workflows/cd.yml`)。`versionCode` を上げて `main` に push すると置かれ、端末ではこのアプリの行の「更新」から入れ替わる。
 
 ## 端末側
 
