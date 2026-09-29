@@ -46,6 +46,14 @@ jobs:
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Robolectric は Android の実行環境(android-all、約 200 MB)を ~/.m2 に落とす。
+      # setup-gradle は ~/.gradle しか持ち越さないので、ここで持ち越さないと push のたびに取りに行く。
+      - name: Robolectric の Android jar を持ち越す
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
+
       - name: 単体テストと debug ビルド
         run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
 
@@ -54,7 +62,7 @@ jobs:
         run: |
           python3 .github/scripts/check-test-results.py \
             app/build/test-results/testDebugUnitTest \
-            --min 12 --label "単体テスト"
+            --min 17 --label "単体テスト"
 
       - name: APK とレポートを残す
         if: always()

@@ -18,11 +18,12 @@ TEST_LINE = re.compile(r"\s*@Test(?![A-Za-z0-9_])")
 # 領域ごとの「何を守っているか」。パッケージの接頭辞で引く。
 AREAS = {
     "nox-apk-manager": {
-        "model": "配布ファイル名の解釈と版の比較。`<名前>-<版>-<debug|release>.apk` の規約から外れた名前を弾き、versionCode があればそれを、無ければ版名を数値で比べる"
+        "model": "配布ファイル名の解釈と版の比較。`<名前>-<版>-<debug|release>.apk` の規約から外れた名前を弾き、versionCode があればそれを、無ければ版名を数値で比べる",
+        "ui": "ホームの行と「更新あり」の板(Robolectric で JVM 上に描く)。失敗した行に次の一手(アンインストール / 再試行)が出ること、自分自身が「全て更新」に含まれないことが件数とボタンで分かること"
     }
 }
 
-CI = {'nox-apk-manager': (12, None, '起動スモーク')}
+CI = {'nox-apk-manager': (17, None, '起動スモーク')}
 
 SLUG = {"nox-apk-manager": "apkmanager"}
 

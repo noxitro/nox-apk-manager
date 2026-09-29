@@ -1,6 +1,6 @@
 # テスト方針と一覧 — nox-apk-manager
 
-対象コミット `63504e1` / 生成 2026-09-25
+対象コミット `5a40751` / 生成 2026-09-28
 この文書は **テストコードから機械的に生成** している。手で数えた値は 1 つも無い。
 
 ## この文書の使い方
@@ -38,10 +38,11 @@ CI は `.github/scripts/check-test-results.py` で結果 XML の `tests=` を数
 起動スモークを別に持つのは、**計装テストが全部緑でも起動時に落ちる不具合が素通りする**
 ため。テストは自分が名指しした物しか守らない。
 
-## 単体テスト(13 件)
+## 単体テスト(24 件)
 
 | 領域 | 何を守るか | テストクラス | 件数 |
 |---|---|---|---|
+| `ui` | ホームの行と「更新あり」の板(Robolectric で JVM 上に描く)。失敗した行に次の一手(アンインストール / 再試行)が出ること、自分自身が「全て更新」に含まれないことが件数とボタンで分かること | `UpdateBoardTest`<br>`JobStateTest` | 11 |
 | `auth` | — | `ServiceAccountAuthTest` | 7 |
 | `model` | 配布ファイル名の解釈と版の比較。`<名前>-<版>-<debug|release>.apk` の規約から外れた名前を弾き、versionCode があればそれを、無ければ版名を数値で比べる | `CatalogTest` | 6 |
 
@@ -57,7 +58,7 @@ CI では起動スモークだけを走らせる。
 
 | ジョブ | 契機 | 内容 | 下限件数 |
 |---|---|---|---|
-| 単体テストとビルド | **push のたび**(全ブランチ)・PR・手動 | `testDebugUnitTest` と `assembleDebug` | 12 |
+| 単体テストとビルド | **push のたび**(全ブランチ)・PR・手動 | `testDebugUnitTest` と `assembleDebug` | 17 |
 | 起動スモーク | **main への push**・PR・手動 | 起動スモーク | — |
 
 計装テストを push のたびに走らせないのは、private リポジトリでは実行時間が課金対象で、
@@ -70,7 +71,7 @@ CI では起動スモークだけを走らせる。
 
 次が全部成立したときだけ「問題なし」と言える。1 つでも欠けたら言えない。
 
-1. 単体テストの実行件数が 12 件以上で、失敗もエラーも 0
+1. 単体テストの実行件数が 17 件以上で、失敗もエラーも 0
 2. (計装テストは未整備)
 3. 起動スモークで logcat に `FATAL EXCEPTION` が無く、プロセスが生きている
 4. この文書とコードがずれていない(`verify-testing-doc.py` が緑)
@@ -89,13 +90,15 @@ CI では起動スモークだけを走らせる。
 {
   "schema": 1,
   "repo": "nox-apk-manager",
-  "generatedAt": "2026-09-25",
-  "commit": "63504e1",
+  "generatedAt": "2026-09-28",
+  "commit": "5a40751",
   "unit": {
-    "total": 13,
+    "total": 24,
     "classes": {
       "auth/ServiceAccountAuthTest": 7,
-      "model/CatalogTest": 6
+      "model/CatalogTest": 6,
+      "ui/JobStateTest": 5,
+      "ui/UpdateBoardTest": 6
     }
   },
   "instrumented": {
@@ -105,7 +108,7 @@ CI では起動スモークだけを走らせる。
     "classes": {}
   },
   "ciFloors": {
-    "unit": 12,
+    "unit": 17,
     "instrumented": null
   }
 }
