@@ -139,6 +139,8 @@ class MainActivity : ComponentActivity() {
                             onOpenApp = viewModel::openApp,
                             onDismissJob = viewModel::dismissJob,
                             onReopenConfirm = viewModel::openPendingConfirm,
+                            onRetry = viewModel::retry,
+                            onUninstallFailed = viewModel::uninstallFailed,
                         )
                         else -> SettingsScreen(
                             state = state,

@@ -55,11 +55,19 @@ data class JobState(
     val targetPackage: String? = null,
     val targetVersionCode: Long? = null,
     val targetVersionName: String? = null,
+    /** 失敗したときに入れようとしていたビルド。「再試行」で同じ版を入れ直すのに使う。 */
+    val build: ApkBuild? = null,
+    /** 署名不一致・ダウングレードで失敗した。入れ直すにはアンインストールが要る。 */
+    val needsUninstall: Boolean = false,
 ) {
     enum class Stage { DOWNLOADING, INSTALLING, WAITING_USER, DONE, FAILED }
     val isActive: Boolean get() = stage == Stage.DOWNLOADING || stage == Stage.INSTALLING || stage == Stage.WAITING_USER
     /** 確認画面を開き直せるか。 */
     val canReopenConfirm: Boolean get() = stage == Stage.WAITING_USER && sessionId != null
+    /** 失敗の行に「アンインストール」を出すか。 */
+    val canUninstall: Boolean get() = stage == Stage.FAILED && needsUninstall && targetPackage != null
+    /** 失敗の行に「再試行」を出すか。アンインストールが要る失敗は、入れ直しても同じ理由で弾かれるので出さない。 */
+    val canRetry: Boolean get() = stage == Stage.FAILED && !needsUninstall && build != null
 }
 
 sealed interface SyncState {
@@ -274,10 +282,39 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun uninstall(entry: AppEntry) {
-        val pkg = entry.packageName ?: return
+        uninstallPackage(entry.packageName ?: return)
+    }
+
+    /** 失敗した行の「アンインストール」。APK から読んだ package 名を使う(meta.json が無い行でも効くように)。 */
+    fun uninstallFailed(project: String) {
+        uninstallPackage(_state.value.jobs[project]?.targetPackage ?: return)
+    }
+
+    private fun uninstallPackage(pkg: String) {
         @Suppress("DEPRECATION")
         val intent = Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:$pkg"))
         _events.tryEmit(HomeEvent.StartActivity(intent))
+    }
+
+    /**
+     * 失敗した行の「再試行」。前回と同じビルドを入れ直す。
+     *
+     * ただし、一覧を読み直してそのビルドが Drive から消えた、あるいは設定で variant を切り替えて
+     * 行が別の variant を指すようになったときは、行に出ているビルド([AppEntry.selected])を入れる。
+     * 行に書いてあるものと違う物を入れないため。
+     */
+    fun retry(project: String) {
+        val s = _state.value
+        val entry = s.entries.firstOrNull { it.project == project }
+        if (entry == null) {
+            _events.tryEmit(HomeEvent.Snack("$project は Drive の builds/ に見当たりません。一覧を読み直してください"))
+            return
+        }
+        val previous = s.jobs[project]?.build
+        val stillValid = previous != null &&
+            entry.builds.any { it.driveFileId == previous.driveFileId } &&
+            previous.variant == entry.selected?.variant
+        install(entry, if (stillValid) previous else entry.selected)
     }
 
     /**
@@ -289,7 +326,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshInstalledStates() {
         _state.update { s ->
             val entries = s.entries.map { repo.refreshInstalledState(it) }
-            val jobs = s.jobs.mapValues { (_, job) ->
+            // アンインストールが要る失敗は、アンインストールが済んだら役目を終えるので畳む。
+            // 行は「導入」に戻るので、そこから入れ直せる。
+            val jobs = s.jobs.filterValues { job ->
+                !(job.needsUninstall && job.targetPackage != null && repo.installedInfo(job.targetPackage) == null)
+            }.mapValues { (_, job) ->
                 if (!job.isActive || job.targetPackage == null) return@mapValues job
                 val installed = repo.installedInfo(job.targetPackage) ?: return@mapValues job
                 val done = job.targetVersionCode?.let { installed.versionCode >= it }
@@ -343,6 +384,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 val all = _state.value.updates
                 val (self, others) = all.partition { it.isSelf }
                 for (entry in others) {
+                    // 行の「更新」や「再試行」で既に入れている最中の行には重ねない
+                    if (_state.value.jobs[entry.project]?.isActive == true) continue
                     val build = entry.selected ?: continue
                     runInstall(entry, build)
                 }
@@ -366,6 +409,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun runInstall(entry: AppEntry, build: ApkBuild) {
         val project = entry.project
         fun setJob(job: JobState) = _state.update { it.copy(jobs = it.jobs + (project to job)) }
+        // 失敗には入れようとしたビルドと package 名を持たせる(行から「再試行」「アンインストール」するため)。
+        var failedPackage: String? = entry.packageName
+        fun fail(message: String, needsUninstall: Boolean = false) = setJob(
+            JobState(
+                JobState.Stage.FAILED,
+                message = message,
+                targetPackage = failedPackage,
+                build = build,
+                needsUninstall = needsUninstall,
+            ),
+        )
 
         try {
             val file = repo.apkCacheFile(build)
@@ -377,23 +431,24 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     setJob(JobState(JobState.Stage.DOWNLOADING, p, "ダウンロード $done / $sizeLabel"))
                 }
             } catch (e: ServiceAccountAuth.MissingKey) {
-                setJob(JobState(JobState.Stage.FAILED, message = e.message.orEmpty()))
+                fail(e.message.orEmpty())
                 return
             } catch (e: IOException) {
-                setJob(JobState(JobState.Stage.FAILED, message = "ダウンロードに失敗: ${e.message ?: e.javaClass.simpleName}"))
+                fail("ダウンロードに失敗: ${e.message ?: e.javaClass.simpleName}")
                 return
             }
 
             // 落とした APK 自身から package 名を確かめる。meta.json と食い違えば入れない。
             val inspection = repo.inspectApk(file)
             if (inspection == null) {
-                setJob(JobState(JobState.Stage.FAILED, message = "APK として読めませんでした(ファイルが壊れている可能性)"))
+                fail("APK として読めませんでした(ファイルが壊れている可能性)")
                 return
             }
             if (entry.packageName != null && entry.packageName != inspection.packageName) {
-                setJob(JobState(JobState.Stage.FAILED, message = "meta.json の package(${entry.packageName})と APK の package(${inspection.packageName})が違います"))
+                fail("meta.json の package(${entry.packageName})と APK の package(${inspection.packageName})が違います")
                 return
             }
+            failedPackage = inspection.packageName
             if (entry.packageName == null) {
                 container.prefs.rememberPackageName(project, inspection.packageName)
             }
@@ -460,8 +515,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     file.delete()
                 }
                 is ApkInstaller.Result.Aborted ->
-                    setJob(JobState(JobState.Stage.FAILED, message = "キャンセルされました"))
+                    fail("キャンセルされました")
                 is ApkInstaller.Result.Failure -> {
+                    val needsUninstall = result.isSignatureMismatch || result.isDowngrade
                     val reason = when {
                         result.isSignatureMismatch ->
                             "署名が違うので上書きできません。いったんアンインストールしてから入れ直してください(debug と release の取り違えか、鍵の変更)"
@@ -469,14 +525,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                             "端末に入っている版の方が新しいので入れられません。戻すならアンインストールが必要です"
                         else -> "インストールに失敗: ${result.message.ifBlank { "code ${result.status}" }}"
                     }
-                    setJob(JobState(JobState.Stage.FAILED, message = reason))
+                    fail(reason, needsUninstall)
                 }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
-            setJob(JobState(JobState.Stage.FAILED, message = "中断しました"))
+            fail("中断しました")
             throw e
         } catch (e: Exception) {
-            setJob(JobState(JobState.Stage.FAILED, message = "失敗: ${e.message ?: e.javaClass.simpleName}"))
+            fail("失敗: ${e.message ?: e.javaClass.simpleName}")
         }
     }
 

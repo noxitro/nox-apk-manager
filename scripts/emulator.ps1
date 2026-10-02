@@ -19,8 +19,7 @@
   名前に持ち主が書いてあれば、`adb devices` と `emu avd name` だけで
   誰の端末かが分かる。
 
-  API 36 イメージが起動ハングした前歴があるため
-  (global-llm-wiki「Androidエミュレータ検証環境の落とし穴」)、既定は API 34。
+  API 36 イメージが起動ハングした前歴があるため、既定は API 34。
 #>
 param(
     [string]$Avd = "apkmanager_test",

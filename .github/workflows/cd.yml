@@ -1,0 +1,38 @@
+# nox-apk-manager 自身の配布(CD)
+#
+# main に push すると、テスト → release ビルド(PC と同じ debug 鍵で署名)→ Drive の builds/nox-apk-manager/ への配置まで行う。
+# ほかの自作アプリと同じ共通ワークフロー(publish-apk.yml)を、このリポジトリの中から呼ぶ。
+# 端末では、このアプリ自身の行の「更新」を押すだけになる(自分自身は「全て更新」の対象外)。
+#
+# 前提: このリポジトリの Secrets に DEBUG_KEYSTORE_BASE64 と RCLONE_DRIVE_TOKEN が入っていること
+#       (scripts/set-ci-secrets.ps1 -Repo nox-apk-manager で登録する。手順は docs/CD.md)。
+#       無ければ最初のステップで、何が足りないかを出して止まる。
+# 配布のたびに app/build.gradle.kts の versionCode を上げる(Drive にある版より大きいときだけ置く)。
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 同じ versionCode の版が Drive にあっても置き直す
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-apk.yml
+    with:
+      project: nox-apk-manager
+      gradle-tasks: ":app:testDebugUnitTest :app:assembleRelease"
+      apk: app/build/outputs/apk/release/app-release.apk
+      # 端末に入っている版の署名。Variables に SIGNING_CERT_SHA256 があれば、Secrets の鍵が違うときに置く前に止める
+      signing-cert-sha256: ${{ vars.SIGNING_CERT_SHA256 }}
+      force: ${{ inputs.force == true }}
+    secrets:
+      DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+      RCLONE_DRIVE_TOKEN: ${{ secrets.RCLONE_DRIVE_TOKEN }}

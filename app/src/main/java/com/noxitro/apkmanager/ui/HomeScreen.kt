@@ -78,6 +78,8 @@ fun HomeScreen(
     onOpenApp: (AppEntry) -> Unit,
     onDismissJob: (String) -> Unit,
     onReopenConfirm: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onUninstallFailed: (String) -> Unit,
 ) {
     val listState = rememberLazyGridState()
     val loading = state.sync is SyncState.Loading
@@ -144,7 +146,7 @@ fun HomeScreen(
 
             if (state.entries.isNotEmpty()) {
                 if (state.filter == Filter.ALL || state.filter == Filter.UPDATES) {
-                    updateBoard(state, onUpdateAll, onCancelBatch, onOpenDetail, onInstall, onOpenApp, onDismissJob, onReopenConfirm)
+                    updateBoard(state, onUpdateAll, onCancelBatch, onOpenDetail, onInstall, onOpenApp, onDismissJob, onReopenConfirm, onRetry, onUninstallFailed)
                 }
                 val rest = if (state.filter == Filter.ALL) state.entries.filter { !it.isUpdateAvailable } else if (state.filter == Filter.UPDATES) emptyList() else state.filtered
                 if (rest.isNotEmpty()) {
@@ -152,11 +154,11 @@ fun HomeScreen(
                     val others = rest.filter { !it.isInstalled }
                     if (installed.isNotEmpty()) {
                         sectionHeader("section-installed", "導入済み", installed.size)
-                        rows(installed, state, onOpenDetail, onInstall, onOpenApp, onDismissJob, onReopenConfirm)
+                        rows(installed, state, onOpenDetail, onInstall, onOpenApp, onDismissJob, onReopenConfirm, onRetry, onUninstallFailed)
                     }
                     if (others.isNotEmpty()) {
                         sectionHeader("section-others", "未導入", others.size)
-                        rows(others, state, onOpenDetail, onInstall, onOpenApp, onDismissJob, onReopenConfirm)
+                        rows(others, state, onOpenDetail, onInstall, onOpenApp, onDismissJob, onReopenConfirm, onRetry, onUninstallFailed)
                     }
                 } else if (state.filter != Filter.ALL && state.filtered.isEmpty()) {
                     fullWidth(key = "empty-filter") { EmptyFilter(state.filter) }
@@ -216,8 +218,13 @@ private fun LazyGridScope.updateBoard(
     onOpenApp: (AppEntry) -> Unit,
     onDismissJob: (String) -> Unit,
     onReopenConfirm: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onUninstallFailed: (String) -> Unit,
 ) {
     val updates = state.updates
+    // 自分自身は「全て更新」の対象外(HomeViewModel.updateAll)。件数と主ボタンをそれに合わせる。
+    val selfCount = updates.count { it.isSelf }
+    val batchTargets = updates.size - selfCount
     // 板は 1 枚の面。列が増えても面を割らないよう、板ごと 1 つのセルに入れて
     // 中で行を並べる(更新のある行はたかだかプロジェクト数なので、遅延にしなくてよい)。
     fullWidth(key = "board") {
@@ -238,8 +245,9 @@ private fun LazyGridScope.updateBoard(
                         )
                         if (updates.isNotEmpty()) {
                             val total = updates.sumOf { it.selected?.sizeBytes ?: 0L }
+                            val selfNote = if (selfCount > 0 && batchTargets > 0) "(うち $selfCount 件は個別に更新)" else ""
                             Text(
-                                "${updates.size} 件 · 合計 ${formatSize(total)}",
+                                "${updates.size} 件 · 合計 ${formatSize(total)}$selfNote",
                                 style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -251,7 +259,8 @@ private fun LazyGridScope.updateBoard(
                             )
                         }
                     }
-                    if (updates.isNotEmpty()) {
+                    // 更新が自分自身だけなら「全て更新」は何もしないので出さない。行の「更新」から入れる。
+                    if (state.batchRunning || batchTargets > 0) {
                         if (state.batchRunning) {
                             OutlinedButton(onClick = onCancelBatch) { Text("中止") }
                         } else {
@@ -278,6 +287,8 @@ private fun LazyGridScope.updateBoard(
                                                 onOpenApp = { onOpenApp(entry) },
                                                 onDismissJob = { onDismissJob(entry.project) },
                                                 onReopenConfirm = { onReopenConfirm(entry.project) },
+                                                onRetry = { onRetry(entry.project) },
+                                                onUninstallFailed = { onUninstallFailed(entry.project) },
                                             )
                                         }
                                     }
@@ -319,6 +330,8 @@ private fun LazyGridScope.rows(
     onOpenApp: (AppEntry) -> Unit,
     onDismissJob: (String) -> Unit,
     onReopenConfirm: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onUninstallFailed: (String) -> Unit,
 ) {
     items(entries, key = { "r-" + it.project }) { entry ->
         AppRow(
@@ -331,6 +344,8 @@ private fun LazyGridScope.rows(
             onOpenApp = { onOpenApp(entry) },
             onDismissJob = { onDismissJob(entry.project) },
             onReopenConfirm = { onReopenConfirm(entry.project) },
+            onRetry = { onRetry(entry.project) },
+            onUninstallFailed = { onUninstallFailed(entry.project) },
         )
     }
 }

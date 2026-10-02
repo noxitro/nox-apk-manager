@@ -8,7 +8,7 @@ android
 
 ## Stack
 
-Kotlin + Jetpack Compose (Material 3)。兄弟プロジェクト(book-log 等)と同じ構成で、AGP 8.13 / Kotlin 2.0 / compileSdk 36 / minSdk 26。
+Kotlin + Jetpack Compose (Material 3)。兄弟プロジェクトと同じ構成で、AGP 8.13 / Kotlin 2.0 / compileSdk 36 / minSdk 26。
 Drive は REST v3 を OkHttp で直接叩く。認証は**サービスアカウント**(秘密鍵で署名した JWT でトークンを取る)。
 Google Play 開発者サービスに依存しないので GMS 非搭載端末でも動き、同意画面の refresh token 7 日失効にも当たらない。
 DI フレームワーク無し(画面が少ない)。
@@ -46,7 +46,7 @@ Drive の `builds/` を端末から読み、インストール済みの版と比
 ## Capabilities and Constraints
 
 - 既定で入れる variant は **release**。行ごとに debug へ切り替えられる。
-  debug と release は署名が違うと相互に上書きできない(book-log だけ release 専用鍵、他は debug 鍵)。
+  debug と release は署名が違うと相互に上書きできない(release 専用鍵のアプリもあるが、多くは debug 鍵)。
   失敗時は「署名が違うので一度アンインストールが必要」と言葉で出す。
 - 端末の方が新しい(手元で直接入れた)場合はダウングレードとして区別し、黙って上書きしない。
 - `meta.json` が無いフォルダは、ファイル名から版と variant を推定して一覧に出す。package 名が分からないので
@@ -68,7 +68,7 @@ UI 文言は日本語。
 
 ## Evidence on Hand
 
-- 実在する配布フォルダ 8 つ(book-log, clipboard, Cockpit, LaunchDrawer, manual-rotate, opencode ほか)。
+- 実在する配布フォルダ 8 つ。
   版は 0.1〜0.6 台、APK は 1.4MB〜27MB。
 - 各プロジェクトの説明文は README/PRODUCT.md から `meta.json` に転記する。アプリ内で捏造しない。
 - アイコンは端末にインストール済みなら PackageManager から、未インストールなら Drive の `icon.png` か、
