@@ -85,7 +85,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 `builds/` があればそれを Drive の代わりに読む([ApkManagerApplication.kt:44](../app/src/main/java/com/noxitro/apkmanager/ApkManagerApplication.kt#L44))。
 
 ```
-adb push "G:/マイドライブ/builds" /sdcard/Android/data/com.noxitro.apkmanager/files/builds
+adb push "$env:NOX_BUILDS_ROOT" /sdcard/Android/data/com.noxitro.apkmanager/files/builds
 adb shell am force-stop com.noxitro.apkmanager
 ```
 

@@ -152,7 +152,7 @@ pwsh scripts\check-drive-service-account.ps1 -KeyFile "$env:USERPROFILE\.secrets
 ### 4-1. APK を入れる
 
 ```powershell
-adb install -r "G:\マイドライブ\builds\nox-apk-manager\nox-apk-manager-0.4.0-debug.apk"
+adb install -r "$env:NOX_BUILDS_ROOT\nox-apk-manager\nox-apk-manager-<版>-release.apk"
 ```
 
 ### 4-2. 鍵を送る
@@ -215,7 +215,7 @@ adb など別の経路で入れたアプリの初回だけはダイアログが�
 E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project photo-viewer -Apk app\build\outputs\apk\release\app-release.apk
 ```
 
-- 配布先 `G:\マイドライブ\builds\<Project>\<Project>-<versionName>-<variant>.apk` にコピーし、同じフォルダの `meta.json` を更新する。
+- 配布先 `$env:NOX_BUILDS_ROOT\<Project>\<Project>-<versionName>-<variant>.apk`(Drive for Desktop の `マイドライブ\builds`。ドライブ文字はアカウントごとに違うので環境変数で持つ)にコピーし、同じフォルダの `meta.json` を更新する。
 - versionName / variant / package 名は APK 自身から `aapt2` で読むので、引数で間違えようがない。
 - 説明文を変えるときは `-Description "..."`。`icon.png` を同じフォルダに置けば未インストールでもアイコンが出る。
 - 配布フォルダ全体の `meta.json` を作り直すなら `scripts\regen-meta.ps1`。
