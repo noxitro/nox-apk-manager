@@ -1,6 +1,6 @@
 # テスト方針と一覧 — nox-apk-manager
 
-対象コミット `5a40751` / 生成 2026-09-28
+対象コミット `86d7b63` / 生成 2026-10-03
 この文書は **テストコードから機械的に生成** している。手で数えた値は 1 つも無い。
 
 ## この文書の使い方
@@ -38,13 +38,14 @@ CI は `.github/scripts/check-test-results.py` で結果 XML の `tests=` を数
 起動スモークを別に持つのは、**計装テストが全部緑でも起動時に落ちる不具合が素通りする**
 ため。テストは自分が名指しした物しか守らない。
 
-## 単体テスト(24 件)
+## 単体テスト(40 件)
 
 | 領域 | 何を守るか | テストクラス | 件数 |
 |---|---|---|---|
-| `ui` | ホームの行と「更新あり」の板(Robolectric で JVM 上に描く)。失敗した行に次の一手(アンインストール / 再試行)が出ること、自分自身が「全て更新」に含まれないことが件数とボタンで分かること | `UpdateBoardTest`<br>`JobStateTest` | 11 |
-| `auth` | — | `ServiceAccountAuthTest` | 7 |
+| `ui` | ホームの行と「更新あり」の板(Robolectric で JVM 上に描く)。失敗した行に次の一手(アンインストール / 再試行)が出ること、自分自身が「全て更新」に含まれないことが件数とボタンで分かること。接続方法の画面の「今の状態」。分からないもの(共有の可否など)を未と決めつけず、違う手順に誘導しないこと | `SetupStatusTest`<br>`UpdateBoardTest`<br>`JobStateTest` | 17 |
+| `auth` | Drive の認証と鍵の取り込み。サービスアカウントの JWT の署名と中身、送られた・選ばれた鍵の検査(文字コード、OAuth クライアント JSON との取り違え)と、弾いた理由が出ること | `PushedKeyTest`<br>`ServiceAccountAuthTest` | 15 |
 | `model` | 配布ファイル名の解釈と版の比較。`<名前>-<版>-<debug|release>.apk` の規約から外れた名前を弾き、versionCode があればそれを、無ければ版名を数値で比べる | `CatalogTest` | 6 |
+| `drive` | Drive のエラーの見分け。Drive API が無効な 403 を「builds/ が未共有」と取り違えないこと | `DriveExceptionTest` | 2 |
 
 ## 計装テスト(0 件)
 
@@ -90,14 +91,17 @@ CI では起動スモークだけを走らせる。
 {
   "schema": 1,
   "repo": "nox-apk-manager",
-  "generatedAt": "2026-09-28",
-  "commit": "5a40751",
+  "generatedAt": "2026-10-03",
+  "commit": "86d7b63",
   "unit": {
-    "total": 24,
+    "total": 40,
     "classes": {
+      "auth/PushedKeyTest": 8,
       "auth/ServiceAccountAuthTest": 7,
+      "drive/DriveExceptionTest": 2,
       "model/CatalogTest": 6,
       "ui/JobStateTest": 5,
+      "ui/SetupStatusTest": 6,
       "ui/UpdateBoardTest": 6
     }
   },

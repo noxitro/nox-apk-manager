@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Inbox
@@ -38,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -64,6 +67,9 @@ fun HomeScreen(
     contentPadding: PaddingValues,
     onRefresh: () -> Unit,
     onReload: () -> Unit,
+    onPickKey: () -> Unit,
+    onCopied: () -> Unit,
+    onOpenGuide: () -> Unit,
     onFilter: (Filter) -> Unit,
     onUpdateAll: () -> Unit,
     onCancelBatch: () -> Unit,
@@ -90,7 +96,7 @@ fun HomeScreen(
             contentPadding = contentPadding,
             modifier = Modifier.fillMaxSize(),
         ) {
-            fullWidth(key = "hero") { Hero(state, onRefresh) }
+            fullWidth(key = "hero") { Hero(state, onRefresh, onOpenGuide) }
 
             fullWidth(key = "chips") {
                 Row(
@@ -118,7 +124,17 @@ fun HomeScreen(
 
             when (val sync = state.sync) {
                 is SyncState.Error -> if (state.entries.isEmpty()) {
-                    fullWidth(key = "error") { ErrorBlock(sync, onRetry = onRefresh, onReload = onReload) }
+                    fullWidth(key = "error") {
+                        ErrorBlock(
+                            sync,
+                            state.serviceAccountEmail,
+                            onRetry = onRefresh,
+                            onReload = onReload,
+                            onPickKey = onPickKey,
+                            onCopied = onCopied,
+                            onOpenGuide = onOpenGuide,
+                        )
+                    }
                     return@LazyVerticalGrid
                 }
                 SyncState.Loading, SyncState.Idle -> if (state.entries.isEmpty()) {
@@ -164,7 +180,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun Hero(state: HomeUiState, onRefresh: () -> Unit) {
+private fun Hero(state: HomeUiState, onRefresh: () -> Unit, onOpenGuide: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Column(modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -173,10 +189,17 @@ private fun Hero(state: HomeUiState, onRefresh: () -> Unit) {
                 val sub = when (val s = state.sync) {
                     is SyncState.Ready -> "Drive の builds/ · ${s.syncedAtLabel} に同期"
                     SyncState.Loading -> "Drive を読んでいます…"
-                    is SyncState.Error -> if (s.needsKey) "鍵が未設定" else "同期できていません"
+                    is SyncState.Error -> when {
+                        s.needsKey -> "鍵が未設定"
+                        s.needsShare -> "builds/ が未共有"
+                        else -> "同期できていません"
+                    }
                     SyncState.Idle -> ""
                 }
                 Text(sub, style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), color = scheme.onSurfaceVariant)
+            }
+            IconButton(onClick = onOpenGuide) {
+                Icon(Icons.AutoMirrored.Outlined.HelpOutline, contentDescription = "接続方法")
             }
             IconButton(onClick = onRefresh, enabled = state.sync !is SyncState.Loading) {
                 Icon(Icons.Default.Refresh, contentDescription = "Drive を読み直す")
@@ -340,10 +363,20 @@ private fun LoadingBlock() {
 }
 
 @Composable
-private fun ErrorBlock(error: SyncState.Error, onRetry: () -> Unit, onReload: () -> Unit) {
+private fun ErrorBlock(
+    error: SyncState.Error,
+    serviceAccountEmail: String?,
+    onRetry: () -> Unit,
+    onReload: () -> Unit,
+    onPickKey: () -> Unit,
+    onCopied: () -> Unit,
+    onOpenGuide: () -> Unit,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 64.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = if (error.needsKey) 24.dp else 64.dp),
     ) {
         Icon(
             Icons.Outlined.CloudOff,
@@ -353,7 +386,11 @@ private fun ErrorBlock(error: SyncState.Error, onRetry: () -> Unit, onReload: ()
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            if (error.needsKey) "Drive の鍵がまだ入っていません" else "読み込めませんでした",
+            when {
+                error.needsKey -> "Drive の鍵がまだ入っていません"
+                error.needsShare -> "builds/ がまだ共有されていません"
+                else -> "読み込めませんでした"
+            },
             style = MaterialTheme.typography.titleMedium,
         )
         Spacer(Modifier.height(8.dp))
@@ -363,19 +400,27 @@ private fun ErrorBlock(error: SyncState.Error, onRetry: () -> Unit, onReload: ()
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        if (error.needsKey) {
-            Spacer(Modifier.height(12.dp))
-            // 鍵は PC から入れる。VR ヘッドセットのような文字入力の辛い端末でも、ここは PC で済む。
-            Text(
-                "PC から次を実行してからもう一度読んでください。" + "\n" +
-                    "adb push <鍵>.json /sdcard/Android/data/com.noxitro.apkmanager/files/nox-drive-sa.json",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
+        when {
+            // スマホ単体で完結する手順(ブラウザで鍵を作る → ファイルを選ぶ)。PC からの adb push も末尾に残す。
+            error.needsKey -> {
+                Spacer(Modifier.height(20.dp))
+                Box(modifier = Modifier.widthIn(max = 480.dp)) { KeySetupGuide(onPickKey, onOpenGuide) }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = onReload) { Text("もう一度読む") }
+            }
+            error.needsShare && serviceAccountEmail != null -> {
+                Spacer(Modifier.height(16.dp))
+                Box(modifier = Modifier.widthIn(max = 480.dp)) { ShareGuide(serviceAccountEmail, onCopied) }
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = onRetry) { Text("もう一度読む") }
+                TextButton(onClick = onOpenGuide) { Text("接続方法を見る") }
+            }
+            else -> {
+                Spacer(Modifier.height(20.dp))
+                Button(onClick = onRetry) { Text("もう一度読む") }
+                TextButton(onClick = onOpenGuide) { Text("接続方法を見る") }
+            }
         }
-        Spacer(Modifier.height(20.dp))
-        Button(onClick = if (error.needsKey) onReload else onRetry) { Text("もう一度読む") }
     }
 }
 

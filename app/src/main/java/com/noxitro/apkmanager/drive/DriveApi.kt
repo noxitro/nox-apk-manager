@@ -158,4 +158,16 @@ class DriveApi(
 
 class DriveException(val code: Int, message: String) : IOException("Drive HTTP $code: $message") {
     val isAuthError: Boolean get() = code == 401 || code == 403
+
+    /**
+     * プロジェクトで Drive API が有効になっていない(403 accessNotConfigured / SERVICE_DISABLED)。
+     * トークンは取れるのに読み取りだけ 403 になるので、「共有していない」と取り違えやすい。
+     * 共有していないときはサービスアカウントから builds が見えないだけで、403 にはならない。
+     */
+    val isApiDisabled: Boolean
+        get() = code == 403 && API_DISABLED_MARKERS.any { message.orEmpty().contains(it) }
+
+    private companion object {
+        val API_DISABLED_MARKERS = listOf("accessNotConfigured", "SERVICE_DISABLED", "has not been used in project")
+    }
 }

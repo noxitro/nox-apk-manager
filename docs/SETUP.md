@@ -10,6 +10,56 @@
 > サービスアカウントはユーザー認証を通らないので、この 2 つがどちらも消える。
 > 詳しい裏取りは [QUEST.md](QUEST.md) の付録。
 
+## スマホだけで設定する(PC 不要)
+
+アプリを入れたスマホ 1 台で完結する。アプリの画面に手順とリンクが出るので、上から押していけばよい。
+同じ内容(PC からの入れ方・うまくいかないときを含む)は、アプリの **「接続方法」** 画面にもある
+(ホーム右上の「?」、または「設定」→「接続方法を見る」)。画面の先頭で、鍵・共有・インストール許可の
+どれが済んでいるかも分かる。
+
+1. アプリを開くと「Drive の鍵がまだ入っていません」と手順が出る。
+2. 手順 1〜4 のリンクを順に開き、**スマホのブラウザ**で Google Cloud の作業をする
+   (プロジェクト作成 → Drive API を有効化 → サービスアカウント作成 → 鍵(JSON)作成)。
+   鍵はスマホの「ダウンロード」に保存される。
+3. アプリに戻り **「鍵ファイル(JSON)を選ぶ」** → ダウンロードした JSON を選ぶ。
+   取り込んだら、ダウンロードに残った元ファイルはアプリが消す(秘密鍵を端末に残さないため)。
+4. 「builds/ がまだ共有されていません」と、共有先のアドレスが出る。
+   **「コピー」→「Drive を開く」** → `builds` の「︙」→「共有」→ 貼り付け → 閲覧者 → 送信。
+5. アプリに戻って「もう一度読む」。一覧が出れば完了。
+6. 「設定」タブ →「インストールの許可」→「この提供元のアプリを許可」をオン。
+
+共有先のアドレスは、あとからでも「設定」タブでコピーできる。鍵の入れ替えも「設定」タブの「鍵を入れ替える」から。
+
+> 最初の 1 本(このアプリ自身)は、Drive アプリで `builds/nox-apk-manager/` の APK を開けば入れられる。
+
+## PC から設定する(コマンド 2 つ)
+
+PowerShell 7 と、次の 2 つが PC に入っていればよい。
+
+```powershell
+winget install Google.CloudSDK        # gcloud(Google 側の設定に使う)
+winget install Google.PlatformTools   # adb(Android SDK が入っていれば不要)
+```
+
+```powershell
+pwsh scripts\setup-gcp.ps1      # Google 側: パート 1〜3 を自動で(ブラウザで 1〜2 回「許可」を押す)
+pwsh scripts\setup-device.ps1   # 端末側: USB でつないで。パート 4 を自動で
+```
+
+- `setup-gcp.ps1` はプロジェクト・Drive API・サービスアカウント・鍵(`~\.secrets\nox-drive-sa.json`)を作り、
+  マイドライブ直下の `builds/` をサービスアカウントに閲覧者で共有し、読めることを確かめる。
+  済んでいる所は飛ばすので、途中で止まっても同じコマンドをもう一度実行すればよい。
+  自動で共有できなかったときは、共有画面を開いてアドレスをクリップボードに入れて待つ。
+- `setup-device.ps1` はアプリを入れ(入っていなければ)、一度開いてから鍵を送り、取り込まれたかを確かめ、
+  最後に「この提供元のアプリを許可」の画面を開く。**端末で押すのはこのスイッチ 1 つだけ**。
+  2 台目以降は、つなぎ替えて `setup-device.ps1` だけを実行する。
+
+うまくいかないときや、何をしているかを知りたいときは、以下の手作業の手順を見る。
+
+---
+
+## 手作業の手順
+
 アプリが Drive を読む仕組みは次のとおり。
 
 - **サービスアカウント**(GCP が発行する、人ではないアカウント)の秘密鍵で読む。
@@ -102,7 +152,7 @@ pwsh scripts\check-drive-service-account.ps1 -KeyFile "$env:USERPROFILE\.secrets
 ### 4-1. APK を入れる
 
 ```powershell
-adb install -r "G:\マイドライブ\builds\nox-apk-manager\nox-apk-manager-0.4.0-debug.apk"
+adb install -r "$env:NOX_BUILDS_ROOT\nox-apk-manager\nox-apk-manager-<版>-release.apk"
 ```
 
 ### 4-2. 鍵を送る
@@ -115,6 +165,8 @@ adb push "$env:USERPROFILE\.secrets\nox-drive-sa.json" /sdcard/Android/data/com.
 ```
 
 アプリを起動すると、この鍵を読んで端末内の設定(DataStore)に移し、**置いたファイルは消す**。
+名前が `nox-drive-sa.json` でなくても、同じ場所の `*.json` にサービスアカウントの鍵があれば取り込む。
+UTF-16 や BOM 付きで保存し直した JSON も読める。
 秘密鍵を外部ストレージに残さないため。取り込めたかは「設定」タブに出るサービスアカウントのアドレスで分かる。
 
 鍵を入れる前に開くと「Drive の鍵がまだ入っていません」と出る。押す必要のあるボタンは無く、
@@ -140,7 +192,10 @@ adb など別の経路で入れたアプリの初回だけはダイアログが�
 
 | 症状 | 原因 | 対処 |
 |---|---|---|
-| 「Drive の鍵がまだ入っていません」 | 鍵をまだ push していない、または JSON が壊れている | パート 4-2。`private_key` を含む JSON か確認する |
+| 「Drive の鍵がまだ入っていません」+「探した場所 / あったもの」 | 鍵が見つからない(push していない・場所が違う) | パート 4-2。push 先が「探した場所」と同じか、「あったもの」に鍵が無いかを見る |
+| 「〜.json を取り込めませんでした: OAuth クライアントの JSON です」 | 旧方式の OAuth クライアントの JSON を送った | 1-4 のサービスアカウントの鍵を送り直す |
+| 「〜.json を取り込めませんでした: JSON として読めません」など | ファイルが壊れている・別のファイル | Cloud Console からダウンロードしたものをそのまま送る |
+| 「Drive API が有効になっていません」 | 鍵を作ったプロジェクトで Drive API を有効にしていない | 1-2 |
 | 「builds/ を読めません(HTTP 403)」 | `builds/` がサービスアカウントに共有されていない | パート 2 |
 | 「builds フォルダがありません」 | 共有したフォルダの名前が `builds` でない | フォルダ名を確認する。アプリは名前で探す |
 | `[1]` から失敗する(PC の確認スクリプト) | Drive API 無効・鍵の失効・時計のずれ | パート 3 の表 |
@@ -160,7 +215,7 @@ adb など別の経路で入れたアプリの初回だけはダイアログが�
 E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project photo-viewer -Apk app\build\outputs\apk\release\app-release.apk
 ```
 
-- 配布先 `G:\マイドライブ\builds\<Project>\<Project>-<versionName>-<variant>.apk` にコピーし、同じフォルダの `meta.json` を更新する。
+- 配布先 `$env:NOX_BUILDS_ROOT\<Project>\<Project>-<versionName>-<variant>.apk`(Drive for Desktop の `マイドライブ\builds`。ドライブ文字はアカウントごとに違うので環境変数で持つ)にコピーし、同じフォルダの `meta.json` を更新する。
 - versionName / variant / package 名は APK 自身から `aapt2` で読むので、引数で間違えようがない。
 - 説明文を変えるときは `-Description "..."`。`icon.png` を同じフォルダに置けば未インストールでもアイコンが出る。
 - 配布フォルダ全体の `meta.json` を作り直すなら `scripts\regen-meta.ps1`。

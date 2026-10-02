@@ -45,7 +45,10 @@ E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project <proj
 - インストールは PackageInstaller セッション。OS の確認ダイアログは毎回出る。「全て更新」は 1 件ずつ順に進む。
 - Drive は読み取り専用(`drive.readonly`)。整理・書き込みは PC 側(と CI)の責務。
 
-初回のサービスアカウント作成・`builds/` の共有・端末への鍵の投入は [docs/SETUP.md](docs/SETUP.md)。
+初回の設定はスマホ単体で完結する(アプリの画面の手順に沿ってブラウザで鍵を作り、ファイルで選ぶ)。
+手順はアプリの「接続方法」画面(ホーム右上の「?」/ 設定)にもまとめてある。
+PC からなら `pwsh scripts\setup-gcp.ps1`(Google 側)と `pwsh scripts\setup-device.ps1`(端末側)の 2 つ。
+中身と手作業の手順は [docs/SETUP.md](docs/SETUP.md)。
 Meta Quest 3 への移植の検証手順は [docs/QUEST.md](docs/QUEST.md)。
 
 ## 開発
@@ -84,7 +87,7 @@ app/src/main/java/com/noxitro/apkmanager/
   ui/HomeViewModel.kt       … 同期・インストール・一括更新の進行
   ui/HomeScreen.kt          … ヒーロー帯 / チップ / 「更新あり N 件」の板 / 導入済み・未導入
   ui/AppRow.kt, AppDetailSheet.kt, SettingsScreen.kt
-scripts/                    … publish-apk.ps1 / regen-meta.ps1 / apk-meta.ps1(PC 側の配布)、set-ci-secrets.ps1(CI の Secrets)
+scripts/                    … setup-gcp.ps1 / setup-device.ps1(初期設定)、publish-apk.ps1 / regen-meta.ps1 / apk-meta.ps1(PC 側の配布)、set-ci-secrets.ps1(CI の Secrets)
 .github/actions/publish-apk … CI から builds/ に置く Action。.github/workflows/publish-apk.yml から使う
 ```
 

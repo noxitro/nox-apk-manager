@@ -1,6 +1,7 @@
 package com.noxitro.apkmanager
 
 import android.app.Application
+import com.noxitro.apkmanager.auth.PushedKey
 import com.noxitro.apkmanager.auth.ServiceAccountAuth
 import com.noxitro.apkmanager.data.CatalogRepository
 import com.noxitro.apkmanager.data.Prefs
@@ -8,6 +9,8 @@ import com.noxitro.apkmanager.drive.DriveApi
 import com.noxitro.apkmanager.drive.DriveSource
 import com.noxitro.apkmanager.drive.LocalDriveSource
 import com.noxitro.apkmanager.install.ApkInstaller
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -41,19 +44,25 @@ class AppContainer(app: Application) {
     val auth = ServiceAccountAuth(http, keyJsonProvider = { prefs.serviceAccountKeyOnce() })
 
     /**
-     * `adb push` で置かれた鍵を取り込む口。アプリ専用の外部ストレージの [KEY_FILE_NAME] を読み、
-     * DataStore に移してから**元のファイルを消す**(秘密鍵を外部ストレージに残さない)。
-     * 取り込むものが無ければ何もしない。
+     * `adb push` で置かれた鍵を取り込む口。アプリ専用の外部ストレージの [KEY_FILE_NAME]
+     * (無ければ同じ場所の `*.json`)を読み、DataStore に移してから**元のファイルを消す**
+     * (秘密鍵を外部ストレージに残さない)。
+     *
+     * 結果は [lastKeyImport] に残す。鍵が未設定のとき、画面に「どこを見て何があったか」を出すため。
      */
-    private val pushedKeyFile: File = File(app.getExternalFilesDir(null), KEY_FILE_NAME)
+    private val pushedKeyDir: File? = app.getExternalFilesDir(null)
+
+    @Volatile
+    var lastKeyImport: PushedKey.Result? = null
+        private set
 
     suspend fun importPushedKeyIfAny(): Boolean {
-        if (!pushedKeyFile.isFile) return false
-        val text = runCatching { pushedKeyFile.readText() }.getOrNull() ?: return false
-        if (!text.contains("private_key")) return false
-        prefs.setServiceAccountKey(text)
+        val result = withContext(Dispatchers.IO) { PushedKey.inspect(pushedKeyDir, KEY_FILE_NAME) }
+        lastKeyImport = result
+        if (result !is PushedKey.Result.Found) return false
+        prefs.setServiceAccountKey(result.json)
         // DataStore への書き込みが済んでから消す。ここで失敗しても次回もう一度取り込むだけ。
-        pushedKeyFile.delete()
+        withContext(Dispatchers.IO) { result.file.delete() }
         auth.invalidate()
         return true
     }
