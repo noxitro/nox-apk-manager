@@ -1,6 +1,8 @@
-# nox-apk-manager 自身の配布(CD)
+# nox-apk-manager 自身の配布(CD)— **手で起動したときだけ動く**
 #
-# main に push すると、テスト → release ビルド(PC と同じ debug 鍵で署名)→ Drive の builds/nox-apk-manager/ への配置まで行う。
+# 普段の配布は PC で行う(README「このアプリ自身の配布」)。署名鍵(ほかの自作アプリと共通の debug 鍵)と
+# Drive 全体を読み書きできるトークンを GitHub に置かないため。2026-10-03 に main への push での自動実行をやめた。
+# Secrets を登録すれば、Actions の画面から手で起動して、テスト → release ビルド → Drive の builds/nox-apk-manager/ への配置まで行える。
 # ほかの自作アプリと同じ共通ワークフロー(publish-apk.yml)を、このリポジトリの中から呼ぶ。
 # 端末では、このアプリ自身の行の「更新」を押すだけになる(自分自身は「全て更新」の対象外)。
 #
@@ -11,8 +13,6 @@
 name: CD
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       force:
