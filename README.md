@@ -7,10 +7,13 @@ Google Drive の `builds/<project>/` を端末から読み、入っている版�
 Play ストアにも F-Droid にも出さないアプリを、ストア相当の体験(更新バッジ・一括更新・説明文・アイコン)で扱う。
 配布元は既に使っている Google Drive のフォルダで、サーバーは立てない。
 
+**最初の 1 本は [Releases](https://github.com/noxitro/nox-apk-manager/releases/latest) から入れる。**
+APK には鍵も配布先の情報も入っていないので、鍵を入れるまでは何も読めない。以後の更新はアプリ自身が Drive から行う。
+
 ## 配布の規約(PC 側)
 
 ```
-G:\マイドライブ\builds\<project>\
+%NOX_BUILDS_ROOT%\<project>\                     … Drive for Desktop の「マイドライブ\builds」。ドライブ文字はアカウントごとに違うので環境変数で持つ
   <project>-<versionName>-<debug|release>.apk   … 版ごとに残す(古い版も入れ直せる)
   meta.json                                      … package 名・版・variant・sha256・説明。publish-apk.ps1(CI では publish-apk ワークフロー)が書く
   icon.png                                       … 任意。未インストールの行に出す
@@ -23,7 +26,7 @@ E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project <proj
 ```
 
 - 版・variant・package 名は APK 自身から `aapt2` で読む(引数で嘘を書けない)。
-- Gradle の出力先を `G:` に直接向けない(Drive Desktop の同期と競合する)。完成品だけコピーする。
+- Gradle の出力先を Drive の同期フォルダに直接向けない(Drive Desktop の同期と競合する)。完成品だけコピーする。
 - `meta.json` が無い古いフォルダは、ファイル名 `<name>-<version>-<variant>.apk` から版を推定して一覧に出す。
   package 名は分からないので端末と突き合わせられず「状態不明」。一度導入すると次回から比較できる。
 - 全フォルダの `meta.json` を作り直す: `scripts\regen-meta.ps1`。
@@ -34,7 +37,22 @@ E:\dev\github.com\noxitro\nox-apk-manager\scripts\publish-apk.ps1 -Project <proj
 (`.github/workflows/publish-apk.yml`)を用意している。置くものは `publish-apk.ps1` と同じ。
 呼び出す側は yml を 1 つ置き、`scripts\set-ci-secrets.ps1 -Repo <リポジトリ名>` で Secrets を登録するだけ。
 手順・入力・トークンの扱いは [docs/CD.md](docs/CD.md)。
-このアプリ自身も同じ仕組みで配布する(`.github/workflows/cd.yml`)。`versionCode` を上げて `main` に push すると置かれ、端末ではこのアプリの行の「更新」から入れ替わる。
+
+## このアプリ自身の配布(PC)
+
+署名鍵(ほかの自作アプリと共通の debug 鍵)と Drive 全体を読み書きできるトークンを GitHub に置かないため、
+このアプリ自身は **PC でビルドして配る**。`versionCode` を上げて `main` に入れたあと:
+
+```powershell
+scripts\build.ps1
+.\gradlew.bat :app:assembleRelease
+scripts\publish-apk.ps1 -Project nox-apk-manager -Apk app\build\outputs\apk\release\app-release.apk
+Copy-Item app\build\outputs\apk\release\app-release.apk "$env:TEMP\nox-apk-manager-<版>-release.apk"
+gh release create v<版> --target main --title "<版>" "$env:TEMP\nox-apk-manager-<版>-release.apk"
+```
+
+Drive に置いた版は、端末でこのアプリの行の「更新」から入れ替わる。Releases の版は最初の 1 本に使う。
+`.github/workflows/cd.yml` は手で起動したときだけ動く(Secrets を登録した場合)。
 
 ## 端末側
 
