@@ -1,0 +1,4 @@
+# gitleaks の誤検知を 1 件ずつ外す(ルールは緩めない)。
+# ServiceAccountAuthTest は鍵をテストの中で KeyPairGenerator で作り、PEM の見出しを文字列で付けているだけ。
+# リポジトリに本物の秘密鍵は入っていない。
+70f30d5152147c5df16b5f6f30f62b23d52be840:app/src/test/java/com/noxitro/apkmanager/auth/ServiceAccountAuthTest.kt:private-key:34
