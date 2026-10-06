@@ -66,6 +66,7 @@ class InstallE2ETest {
         // 各テストの最初に記録だけを消す。制限そのものは外さない。
         shell("pm set-silent-updates-policy --reset")
         uninstallFixture()
+        dismissNotRespondingDialog()
         // 確認画面は前面の Activity から開く。裏からの起動は OS に止められることがある。
         scenario = ActivityScenario.launch(ComponentActivity::class.java)
         scenario.onActivity { host = it }
@@ -165,12 +166,29 @@ class InstallE2ETest {
                 pending.cancel()
                 throw AssertionError("${RESULT_TIMEOUT_MS / 1000} 秒たっても結果が来ない。画面:\n${dumpScreen()}")
             }
-            val found = device.wait(Until.findObject(button), 500) ?: continue
+            val found = device.wait(Until.findObject(button), 500)
+            if (found == null) {
+                dismissNotRespondingDialog()
+                continue
+            }
             Log.i(TAG, "確認画面: ${found.text} を押す")
             found.click()
             device.wait(Until.gone(button), 5_000)
         }
         Outcome(pending.await(), confirmRequests.get())
+    }
+
+    /**
+     * 「〜は応答していません」のダイアログが出ていたら「待機」で閉じる。
+     * CI の遅いエミュレータでは起動直後にホームアプリ(Pixel Launcher)が応答なしになり、
+     * このダイアログが確認画面を覆って、ボタンが見つからないまま時間切れになる
+     * (2026-10-06 に GitHub Actions の API 35 で 5 件とも発生)。テスト対象の不具合ではない。
+     */
+    private fun dismissNotRespondingDialog() {
+        device.findObject(NOT_RESPONDING_WAIT)?.let {
+            Log.i(TAG, "応答なしのダイアログを閉じる")
+            it.click()
+        }
     }
 
     /** テスト APK の assets から取り出す(端末のファイルでないと PackageInstaller に渡せない)。 */
@@ -210,6 +228,9 @@ class InstallE2ETest {
 
         /** 確認画面の「インストール」/「更新」(肯定のボタン)。文言は言語で変わるので id で探す。 */
         val INSTALL_BUTTON: BySelector = By.pkg(INSTALLER_PACKAGE).res("android:id/button1")
+
+        /** システムの「応答していません」ダイアログの「待機」。 */
+        val NOT_RESPONDING_WAIT: BySelector = By.res("android:id/aerr_wait")
 
         /** 確認画面の「キャンセル」。 */
         val CANCEL_BUTTON: BySelector = By.pkg(INSTALLER_PACKAGE).res("android:id/button2")
