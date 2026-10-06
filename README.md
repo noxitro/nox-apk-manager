@@ -84,12 +84,30 @@ scripts\install-run.ps1           # 入れて起動してスクショと自プ�
 adb -s <serial> push "G:\マイドライブ\builds" /sdcard/Android/data/com.noxitro.apkmanager/files/
 ```
 
-エミュレータは同一ホストで他プロジェクトと共有しない(`apkmanager_test` 専用)。
+エミュレータは同一ホストで他プロジェクトと共有しない(`apkmanager_*` 専用)。
 
-起動スモーク(エミュレータ)は CI では自動で走らない(`workflow_dispatch` の手動実行のみ)。
-1 回約 13 分かかり、Actions の無料枠 2,000 分/月 はアカウント全体で共有されるため。
-**APK を渡す前に必ず手元で `install-run.ps1` まで通すこと。**
-2026-09-06 時点でこのホストは API 34 の google_apis イメージでも QEMU 起動段階でハングするため、
+### インストールの E2E テスト(計装テスト)
+
+本物の PackageInstaller にダミーのアプリ(`fixture/`、パッケージ `com.noxitro.apkmanager.fixture`)を
+入れさせ、OS の確認画面を UiAutomator で押して結果を確かめる
+(`app/src/androidTest/java/com/noxitro/apkmanager/install/InstallE2ETest.kt`)。
+見ているのは、新規 / 自分が入れたアプリの無確認の更新 / 確認画面での取り消し / 署名違い / 版の巻き戻し。
+
+端末はユーザーの実機に寄せた 2 台の AVD で走らせる。2 台とも立ち上げてから、`ANDROID_SERIAL` を付けずに
+`gradlew connectedDebugAndroidTest` を実行すると両方で走る。
+
+| AVD | 寄せた実機 | 画面 | Android |
+|---|---|---|---|
+| `apkmanager_galaxy` | Galaxy(機種は未定のため S24 の画面) | 1080×2340・420dpi | 15(API 35) |
+| `apkmanager_pad8` | Xiaomi Pad 8 | 3200×2136・400dpi | 16(API 36) |
+
+- エミュレータの OS は素の Android。One UI / HyperOS が独自に挟む画面や保護機能(オートブロッカーなど)は再現しない。
+- fixture を署名する 2 つの鍵は、ビルドのたびに `fixture/build/fixture-keys/` に作る使い捨て(リポジトリには置かない)。配布用の鍵とは無関係。
+- CI では PR と main への push のたびに 2 台で走る。このリポジトリは公開なので、Actions の実行時間は無料で、無料枠も減らない。
+- テストは、OS の「30 秒以内に同じアプリを続けて無確認で更新させない」制限(SilentUpdatePolicy)を、
+  テストの間だけ `pm set-silent-updates-policy` で外す。外さないと v1 の直後の v2 で必ず確認画面が出る。
+
+**APK を渡す前に、手元で計装テストと `install-run.ps1` まで通すこと。**
 画面の最終確認は Galaxy 実機で行う。
 
 ## 構成

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- インストールの E2E テストが入れて消すだけのアプリ。コードも画面も持たない。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:hasCode="false"
+        android:label="nox-apk-manager テスト用" />
+
+</manifest>
