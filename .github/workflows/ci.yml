@@ -4,8 +4,12 @@
 #
 # 構成
 #   unit         … JVM 単体テストとビルド。push のたびに走る。数分。
-#   instrumented … エミュレータ上の計装テストと起動スモーク。
-#                  無料枠を守るため手動実行 (workflow_dispatch) のときだけ走る。
+#   instrumented … エミュレータ上の計装テスト(インストールの E2E)と起動スモーク。
+#                  PR と main への push と手動実行で走る。端末は Galaxy 相当と Xiaomi Pad 8 相当の 2 台。
+#
+# このリポジトリは公開なので、標準の GitHub ホストランナーは無料で、月の無料枠も減らない
+# (docs.github.com「GitHub Actions billing」)。非公開の兄弟リポジトリ(book-log など)が
+# エミュレータを手動実行に絞っているのは枠を守るためで、ここには当てはまらない。
 #
 # 「BUILD SUCCESSFUL」は証明にならない。テストが 0 件でも成功で返るので、
 # 結果 XML の tests= を数えて最低件数を下回ったら失敗にしている
@@ -62,7 +66,7 @@ jobs:
         run: |
           python3 .github/scripts/check-test-results.py \
             app/build/test-results/testDebugUnitTest \
-            --min 17 --label "単体テスト"
+            --min 31 --label "単体テスト"
 
       - name: APK とレポートを残す
         if: always()
@@ -76,33 +80,42 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-  # ── 起動スモーク(エミュレータ)──────────────────────────────
-  # このリポジトリにはまだ計装テストが無いので、起動して落ちないことだけを見る。
-  # 計装テストを足したら、他のリポジトリと同じ connectedDebugAndroidTest に差し替える。
+  # ── 計装テストと起動スモーク(エミュレータ)──────────────────
+  # 計装テストは、本物の PackageInstaller にダミーのアプリ(:fixture)を入れさせる E2E
+  # (app/src/androidTest/.../install/InstallE2ETest.kt)。続けて起動スモークも回す。
+  #
+  # 端末はユーザーの実機に寄せた 2 台。ただし OS は素の Android なので、
+  # One UI / HyperOS が独自に挟む画面や保護機能(オートブロッカーなど)は再現しない。
+  # 画面の大きさと Android の版だけを合わせている。
   instrumented:
-    name: 起動スモーク (API ${{ matrix.api-level }})
-    # 手動実行のときだけ走らせる。エミュレータのジョブは 1 回約 13 分
-    # (大半はエミュレータの起動) で、無料枠 2,000 分はアカウント全体で
-    # 共有される。main への push と PR で回していたぶんがそのまま枠を
-    # 削っていたので、ほかの自作アプリと同じ方針に揃えた。
-    #
-    # テストは消していない。配布 (APK を渡す) のたびに手元で
-    #   ./gradlew connectedDebugAndroidTest
-    # を通してから渡すこと。手元の実機/エミュレータが使えないときは
-    # Actions の「Run workflow」からこのジョブを回す。
-    if: github.event_name == 'workflow_dispatch'
+    name: 計装テスト (${{ matrix.device.name }})
+    # PR と main への push で走らせる。ブランチへの push まで回すと、PR を開いている間は
+    # 同じ commit で 2 回走るため。
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        api-level: [34]
+        device:
+          # Galaxy 相当。機種は決めていないので、Galaxy S24 の画面(1080×2340)に合わせた。
+          # One UI 7 の Android 15。
+          - name: Galaxy 相当
+            id: galaxy
+            api-level: 35
+            profile: pixel_6
+            size: 1080x2340
+            density: 420
+          # Xiaomi Pad 8(3200×2136、HyperOS 3 の Android 16)。
+          - name: Xiaomi Pad 8 相当
+            id: pad8
+            api-level: 36
+            profile: pixel_tablet
+            size: 3200x2136
+            density: 400
     steps:
       - uses: actions/checkout@v4
 
-      # エミュレータの userdata パーティションに 7GB 要る。ランナーの既定の空きでは足りず
-      # 「Not enough space to create userdata partition」で落ちる(2026-09-06 に実測)。
-      # このビルドで使わない巨大なツールチェーンを先に消す。
       - name: 空き容量を確保する
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost                       /usr/share/swift /usr/local/lib/android/sdk/ndk || true
@@ -124,27 +137,40 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # エミュレータの起動前に作っておく。起動してからだと、その間エミュレータが遊ぶ。
       - name: APK を作る
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
 
-      - name: 起動スモーク
+      - name: 計装テストと起動スモーク
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ matrix.api-level }}
+          api-level: ${{ matrix.device.api-level }}
           target: google_apis
           arch: x86_64
-          # ローカル検証と同じ端末に揃える。画面が変わると Compose の UI テストが落ちる。
-          profile: pixel_6
+          profile: ${{ matrix.device.profile }}
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: bash .github/scripts/launch-smoke.sh com.noxitro.apkmanager .MainActivity
+          # 画面の大きさと密度を実機に合わせてから走らせる(AVD の定義に Galaxy / Xiaomi は無い)。
+          script: |
+            adb shell wm size ${{ matrix.device.size }}
+            adb shell wm density ${{ matrix.device.density }}
+            ./gradlew --no-daemon connectedDebugAndroidTest
+            bash .github/scripts/launch-smoke.sh com.noxitro.apkmanager .MainActivity
+
+      - name: 実行件数を確かめる
+        if: always()
+        run: |
+          python3 .github/scripts/check-test-results.py app/build/outputs/androidTest-results/connected --min 3 --label "計装テスト"
 
       - name: ログを残す
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: launch-smoke-api${{ matrix.api-level }}
-          path: logcat-full.txt
+          name: instrumented-${{ matrix.device.id }}
+          path: |
+            logcat-full.txt
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
           retention-days: 14
           if-no-files-found: ignore
