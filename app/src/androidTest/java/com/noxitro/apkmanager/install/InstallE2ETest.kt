@@ -58,11 +58,13 @@ class InstallE2ETest {
     fun setUp() {
         // 「提供元不明のアプリ」の許可。実機では利用者が設定画面で一度だけ許可するもの。
         shell("appops set ${context.packageName} REQUEST_INSTALL_PACKAGES allow")
-        // OS は、同じインストーラが同じアプリを 30 秒以内に続けて入れると、無確認の更新を止めて
-        // 確認画面に戻す(SilentUpdatePolicy)。テストは v1 の数秒後に v2 を入れるので必ず当たる
-        // (2026-10-06 に API 35 で実測。外すと確認なしで通る)。実際の更新は何時間も空くので、
-        // ここではその間隔の制限だけを外す。無確認で通る条件そのもの(権限・所有権)は外さない。
-        shell("pm set-silent-updates-policy --allow-unlimited-silent-updates ${context.packageName}")
+        // OS は「無確認の経路を通った試行」を (インストーラ, パッケージ) ごとに記録し、30 秒以内の
+        // 次の無確認の更新を確認画面に戻す(SilentUpdatePolicy)。記録は試行が失敗しても付き
+        // (巻き戻しなど)、アンインストールでも消えない。確認画面で許可したインストールには付かない。
+        // テストは同じ fixture を続けて使うので、前のテストの記録が次のテストに漏れる
+        // (2026-10-06 に API 35 で実測。巻き戻しのテストの直後に更新のテストが落ちた)。
+        // 各テストの最初に記録だけを消す。制限そのものは外さない。
+        shell("pm set-silent-updates-policy --reset")
         uninstallFixture()
         // 確認画面は前面の Activity から開く。裏からの起動は OS に止められることがある。
         scenario = ActivityScenario.launch(ComponentActivity::class.java)

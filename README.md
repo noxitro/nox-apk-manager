@@ -104,8 +104,10 @@ adb -s <serial> push "G:\マイドライブ\builds" /sdcard/Android/data/com.nox
 - エミュレータの OS は素の Android。One UI / HyperOS が独自に挟む画面や保護機能(オートブロッカーなど)は再現しない。
 - fixture を署名する 2 つの鍵は、ビルドのたびに `fixture/build/fixture-keys/` に作る使い捨て(リポジトリには置かない)。配布用の鍵とは無関係。
 - CI では PR と main への push のたびに 2 台で走る。このリポジトリは公開なので、Actions の実行時間は無料で、無料枠も減らない。
-- テストは、OS の「30 秒以内に同じアプリを続けて無確認で更新させない」制限(SilentUpdatePolicy)を、
-  テストの間だけ `pm set-silent-updates-policy` で外す。外さないと v1 の直後の v2 で必ず確認画面が出る。
+- OS は無確認の経路を通った試行を (インストーラ, アプリ) ごとに記録し、30 秒以内の次の無確認の更新を
+  確認画面に戻す(SilentUpdatePolicy。試行が失敗しても、アンインストールしても記録は残る)。
+  テストは同じ fixture を続けて使うので、各テストの最初に `pm set-silent-updates-policy --reset` で記録を消す。
+  実機でも、同じアプリの更新を 30 秒以内にやり直すと確認画面が出るのは OS の仕様。
 
 **APK を渡す前に、手元で計装テストと `install-run.ps1` まで通すこと。**
 画面の最終確認は Galaxy 実機で行う。
