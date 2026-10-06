@@ -36,7 +36,17 @@ class ApkInstaller(private val context: Context) {
             val isDowngrade: Boolean
                 get() = message.contains("INSTALL_FAILED_VERSION_DOWNGRADE")
         }
-        data object Aborted : Result
+        /**
+         * OS が中止を返した(`STATUS_FAILURE_ABORTED`)。確認画面で取り消したときのほか、
+         * セッションが破棄されたときなどにも来る。**理由は [message] に入っている**ので捨てない
+         * (0.7.0 までは捨てていて、画面に「キャンセルされました」としか出せなかった)。
+         *
+         * @param legacyStatus 古い形の失敗コード(`INSTALL_FAILED_*` の数値)。来ないこともある。
+         */
+        data class Aborted(val message: String, val legacyStatus: Int? = null) : Result {
+            /** 画面に出す文。 */
+            val description: String get() = AbortReason.describe(message, legacyStatus)
+        }
     }
 
     /**

@@ -37,7 +37,14 @@ class InstallResultReceiver : BroadcastReceiver() {
             PackageInstaller.STATUS_SUCCESS ->
                 InstallEvents.emitResult(sessionId, ApkInstaller.Result.Success(packageName))
             PackageInstaller.STATUS_FAILURE_ABORTED ->
-                InstallEvents.emitResult(sessionId, ApkInstaller.Result.Aborted)
+                InstallEvents.emitResult(
+                    sessionId,
+                    ApkInstaller.Result.Aborted(
+                        message = message,
+                        // 公開の定数は無いが、OS は古い形の失敗コードもこの名前で載せてくる。
+                        legacyStatus = intent.getIntExtra(EXTRA_LEGACY_STATUS, 0).takeIf { it != 0 },
+                    ),
+                )
             else ->
                 InstallEvents.emitResult(sessionId, ApkInstaller.Result.Failure(status, message, packageName))
         }
@@ -46,5 +53,8 @@ class InstallResultReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION = "com.noxitro.apkmanager.INSTALL_RESULT"
         const val EXTRA_SESSION_ID = "session_id"
+
+        /** `PackageInstaller.EXTRA_LEGACY_STATUS`(隠し API)と同じ名前。 */
+        private const val EXTRA_LEGACY_STATUS = "android.content.pm.extra.LEGACY_STATUS"
     }
 }
