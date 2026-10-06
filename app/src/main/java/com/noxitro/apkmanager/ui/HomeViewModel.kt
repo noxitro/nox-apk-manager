@@ -514,8 +514,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     file.delete()
                 }
+                // 理由ごと出す。「キャンセルされました」だけでは、押した覚えが無いときに直しようが無い。
                 is ApkInstaller.Result.Aborted ->
-                    fail("キャンセルされました")
+                    fail(result.description)
                 is ApkInstaller.Result.Failure -> {
                     val needsUninstall = result.isSignatureMismatch || result.isDowngrade
                     val reason = when {
