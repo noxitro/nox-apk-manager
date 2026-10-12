@@ -22,7 +22,12 @@ adb shell am start -W -n "$PKG/$ACTIVITY"
 sleep 12
 
 echo "--- プロセスの生存を確かめる"
-PID="$(adb shell pidof "$PKG" | tr -d '\r' || true)"
+# Android 7 には pidof が無いことがある。そのときのエラー文を PID と取り違えないよう、
+# 数字だけを受け取り、取れなければ ps の出力から探す。
+PID="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r' | grep -E '^[0-9 ]+$' || true)"
+if [ -z "$PID" ]; then
+  PID="$(adb shell ps | tr -d '\r' | awk -v p="$PKG" '$NF == p { print $2 }' | head -1 || true)"
+fi
 
 echo "--- 自分のプロセスのログ"
 adb logcat -d > logcat-full.txt || true

@@ -96,7 +96,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [34]
+        include:
+          - api-level: 34
+          # Huawei MediaPad M3 Lite 10(Android 7.0 / 1920x1200 / 10.1 インチ)の代わり。
+          # EMUI のイメージは無いので、素の Android 7.0 に画面の大きさと密度だけ合わせる。
+          # 密度は実機の `adb shell wm density` で確かめて合わせること(240 は仮置き)。
+          - api-level: 24
+            wm-size: 1920x1200
+            wm-density: 240
     steps:
       - uses: actions/checkout@v4
 
@@ -138,7 +145,11 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: bash .github/scripts/launch-smoke.sh com.noxitro.apkmanager .MainActivity
+          # script は 1 行ずつ別のシェルで走るので、条件は 1 行に収める。
+          script: |
+            [ -z "${{ matrix.wm-size }}" ] || adb shell wm size ${{ matrix.wm-size }}
+            [ -z "${{ matrix.wm-density }}" ] || adb shell wm density ${{ matrix.wm-density }}
+            bash .github/scripts/launch-smoke.sh com.noxitro.apkmanager .MainActivity
 
       - name: ログを残す
         if: always()
