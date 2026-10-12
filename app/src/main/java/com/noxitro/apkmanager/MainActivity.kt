@@ -2,6 +2,7 @@ package com.noxitro.apkmanager
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -174,15 +175,26 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        canInstall = packageManager.canRequestPackageInstalls()
+        canInstall = canRequestInstalls()
         // アンインストールや OS 側の操作から戻ったときに、端末の現状だけ引き直す
         viewModel.refreshInstalledStates()
     }
 
+    // Android 7 以前はアプリ単位の許可が無く、端末全体の「提供元不明のアプリ」設定を見る。
+    @Suppress("DEPRECATION")
+    private fun canRequestInstalls(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            packageManager.canRequestPackageInstalls()
+        } else {
+            Settings.Secure.getInt(contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS, 0) == 1
+        }
+
     private fun openInstallPermission() {
-        startActivity(
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+        } else {
+            Intent(Settings.ACTION_SECURITY_SETTINGS)
+        }
+        startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }

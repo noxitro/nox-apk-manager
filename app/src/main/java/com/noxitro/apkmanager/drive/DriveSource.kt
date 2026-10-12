@@ -1,6 +1,10 @@
 package com.noxitro.apkmanager.drive
 
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * 「builds/ フォルダを読む」ための最小の口。
@@ -42,6 +46,12 @@ class LocalDriveSource(private val root: File) : DriveSource {
         name = f.name,
         mimeType = if (f.isDirectory) DriveApi.FOLDER_MIME else "application/octet-stream",
         size = if (f.isFile) f.length() else null,
-        modifiedTime = java.time.Instant.ofEpochMilli(f.lastModified()).toString(),
+        modifiedTime = isoUtc(f.lastModified()),
     )
+
+    // java.time は API 26 から。Android 7 でも動くよう SimpleDateFormat で Drive と同じ UTC の ISO 8601 にする。
+    private fun isoUtc(millis: Long): String =
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+            .apply { timeZone = TimeZone.getTimeZone("UTC") }
+            .format(Date(millis))
 }

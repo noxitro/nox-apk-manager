@@ -8,7 +8,7 @@ android
 
 ## Stack
 
-Kotlin + Jetpack Compose (Material 3)。兄弟プロジェクトと同じ構成で、AGP 8.13 / Kotlin 2.0 / compileSdk 36 / minSdk 26。
+Kotlin + Jetpack Compose (Material 3)。兄弟プロジェクトと同じ構成で、AGP 8.13 / Kotlin 2.0 / compileSdk 36 / minSdk 24。
 Drive は REST v3 を OkHttp で直接叩く。認証は**サービスアカウント**(秘密鍵で署名した JWT でトークンを取る)。
 Google Play 開発者サービスに依存しないので GMS 非搭載端末でも動き、同意画面の refresh token 7 日失効にも当たらない。
 DI フレームワーク無し(画面が少ない)。

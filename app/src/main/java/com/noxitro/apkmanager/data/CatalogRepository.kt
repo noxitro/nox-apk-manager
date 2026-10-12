@@ -3,6 +3,7 @@ package com.noxitro.apkmanager.data
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
+import androidx.core.content.pm.PackageInfoCompat
 import com.noxitro.apkmanager.drive.DriveApi
 import com.noxitro.apkmanager.drive.DriveSource
 import com.noxitro.apkmanager.model.ApkBuild
@@ -140,7 +141,7 @@ class CatalogRepository(
         InstalledInfo(
             packageName = packageName,
             versionName = info.versionName,
-            versionCode = info.longVersionCode,
+            versionCode = PackageInfoCompat.getLongVersionCode(info),
         )
     } catch (e: PackageManager.NameNotFoundException) {
         null
@@ -165,7 +166,7 @@ class CatalogRepository(
         ApkInspection(
             packageName = info.packageName,
             versionName = info.versionName,
-            versionCode = info.longVersionCode,
+            versionCode = PackageInfoCompat.getLongVersionCode(info),
             label = runCatching { pm.getApplicationLabel(app).toString() }.getOrNull(),
             icon = runCatching { app.loadIcon(pm) }.getOrNull(),
         )
