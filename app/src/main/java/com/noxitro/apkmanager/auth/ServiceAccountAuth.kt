@@ -10,11 +10,12 @@ import kotlinx.serialization.json.Json
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.ByteString.Companion.decodeBase64
+import okio.ByteString.Companion.toByteString
 import java.io.IOException
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
-import java.util.Base64
 
 /**
  * サービスアカウントの秘密鍵で Drive のアクセストークンを取る。
@@ -110,11 +111,13 @@ class ServiceAccountAuth(
 
     /** PEM(PKCS#8)を読んで SHA256withRSA で署名する。 */
     private fun sign(input: String, pem: String): ByteArray {
-        val der = Base64.getDecoder().decode(
-            pem.replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replace(Regex("""\s"""), ""),
-        )
+        // java.util.Base64 は API 26 から。Android 7 でも動くよう okio を使う。
+        val der = pem.replace("-----BEGIN PRIVATE KEY-----", "")
+            .replace("-----END PRIVATE KEY-----", "")
+            .replace(Regex("""\s"""), "")
+            .decodeBase64()
+            ?.toByteArray()
+            ?: throw IOException("秘密鍵の Base64 を読めません")
         val privateKey = KeyFactory.getInstance("RSA").generatePrivate(PKCS8EncodedKeySpec(der))
         return Signature.getInstance("SHA256withRSA").run {
             initSign(privateKey)
@@ -125,7 +128,7 @@ class ServiceAccountAuth(
 
     private fun String.b64url(): String = toByteArray(Charsets.UTF_8).b64url()
 
-    private fun ByteArray.b64url(): String = Base64.getUrlEncoder().withoutPadding().encodeToString(this)
+    private fun ByteArray.b64url(): String = toByteString().base64Url().trimEnd('=')
 
     companion object {
         const val SCOPE = "https://www.googleapis.com/auth/drive.readonly"
