@@ -22,3 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "NoxApkManager"
 include(":app")
+// インストールの E2E テストが入れるダミーアプリ(app/src/androidTest から使う)。
+include(":fixture")

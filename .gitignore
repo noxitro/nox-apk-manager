@@ -10,6 +10,10 @@ captures/
 local.properties
 .kotlin/
 
+# 起動スモーク(.github/scripts/launch-smoke.sh)がカレントに書くログ
+/logcat-full.txt
+/crash.txt
+
 # エミュレータ検証で撮ったスクリーンショットの置き場
 /build/shots/
 
