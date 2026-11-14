@@ -44,7 +44,7 @@ jobs:
           java-version: '17'
 
       - name: Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # Robolectric は Android の実行環境(android-all、約 200 MB)を ~/.m2 に落とす。
       # setup-gradle は ~/.gradle しか持ち越さないので、ここで持ち越さないと push のたびに取りに行く。
@@ -115,7 +115,7 @@ jobs:
           java-version: '17'
 
       - name: Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: KVM を有効にする
         run: |
