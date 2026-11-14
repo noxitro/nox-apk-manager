@@ -8,7 +8,12 @@
 これを実行して docs/TESTING.md を更新する。手で数字を書き換えない。
 ずれは CI の verify-testing-doc.py が毎回検査する。
 """
-import io, json, re, subprocess, datetime, pathlib
+import datetime
+import io
+import json
+import pathlib
+import re
+import subprocess
 
 _HERE = pathlib.Path(__file__).resolve()
 REPO = _HERE.parents[2].name
@@ -84,7 +89,6 @@ def table(inv, repo):
 
 
 def build(repo):
-    slug = SLUG[repo]
     unit = inventory(repo, "test")
     instr = inventory(repo, "androidTest")
     unit_tbl, unit_total = table(unit, repo)
