@@ -1,0 +1,33 @@
+# gitleaks の設定(このリポジトリ用)。共通設定(github-templates の git-hooks/gitleaks.toml)を写し、
+# このリポジトリ固有の誤検知の除外を足したもの。除外には必ず理由を書く。
+# このファイルがあると共通設定は読まれないので、共通側が変わったらここにも写す。
+
+[extend]
+useDefault = true
+
+# Discord の Webhook URL。URL を知っていれば誰でもそのチャンネルへ投稿できるのに、
+# 既定ルールには Discord のトークン類しか無く、Webhook URL は素通りする。
+[[rules]]
+id = "discord-webhook-url"
+description = "Discord Webhook URL"
+regex = '''https://(?:(?:canary|ptb)\.)?discord(?:app)?\.com/api/(?:v\d+/)?webhooks/\d{17,20}/[A-Za-z0-9_-]{60,}'''
+keywords = ["discord"]
+
+[[allowlists]]
+description = "検査器自身の除外"
+paths = [
+  '''git-hooks/scan\.sh''',
+  '''git-hooks/gitleaks\.toml''',
+]
+
+# ServiceAccountAuthTest の秘密鍵。
+#
+# テストの中で KeyPairGenerator が毎回作る鍵を、PEM の見出しと本体をつないだ文字列に
+# 組み立てている。リポジトリに鍵の値は入っていない。private-key ルールは、
+# この組み立てのための PEM の見出しの文字列に当たる。
+#
+# 外す範囲は「このテストのファイルの private-key」に限る。
+[[allowlists]]
+description = "テストの中で作った鍵を PEM に組み立てる箇所(ServiceAccountAuthTest)"
+targetRules = ["private-key"]
+paths = ['''app/src/test/java/com/noxitro/apkmanager/auth/ServiceAccountAuthTest\.kt''']
